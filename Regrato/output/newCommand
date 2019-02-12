@@ -1,0 +1,7 @@
+Start Time 02-01-2019:18:01:278
+Running run command
+Connected to 10.54.237.40
+Running Command   qb
+Output of  qb stty: standard input: Inappropriate ioctl for deviceUSAGE qb [options]  <QUEUE NAME>options = -d for QUEUE DOWN          -u for QUEUE UP  
+ qb Success
+End Time 02-01-2019:18:01:841

@@ -1,0 +1,90 @@
+2019-01-24 11:02:03,510 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-01-24 11:02:38,829 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-01-24 11:04:43,273 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 11:04:52,411 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 11:04:52,411 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 11:05:42,740 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 11:05:50,012 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 11:05:50,012 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 12:12:46,328 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-01-24 15:40:25,181 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 15:40:28,368 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 15:40:28,368 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 15:42:31,735 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 15:42:34,157 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 15:42:34,157 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 15:49:12,223 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 15:49:12,223 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 15:49:18,254 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 15:52:42,011 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 15:52:45,136 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 15:52:45,136 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 15:53:16,105 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 15:53:18,651 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 15:53:18,651 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 16:08:11,409 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 16:08:14,628 ERROR OUTPUT [] cfpd0196b Aborted with return code 4
+2019-01-24 16:08:14,628 ERROR OUTPUT [] Aborting all session and process
+2019-01-24 17:38:49,232 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 17:38:54,216 ERROR OUTPUT [BranchMaster1] cfpd0196b Aborted with return code 4
+2019-01-24 17:38:54,216 ERROR OUTPUT [BranchMaster1] Aborting all session and process
+2019-01-24 18:28:44,377 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 18:28:48,221 ERROR OUTPUT [BranchMaster1] cfpd0196b Aborted with return code 4
+2019-01-24 18:28:48,221 ERROR OUTPUT [BranchMaster1] Aborting all session and process
+2019-01-24 18:38:51,841 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 18:38:54,733 ERROR OUTPUT [BranchMaster1] cfpd0196b Aborted with return code 4
+2019-01-24 18:38:54,749 ERROR OUTPUT [BranchMaster1] Aborting all session and process
+2019-01-24 18:40:54,261 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-24 18:40:56,855 ERROR OUTPUT [BranchMaster1] cfpd0196b Aborted with return code 4
+2019-01-24 18:40:56,855 ERROR OUTPUT [BranchMaster1] Aborting all session and process
+2019-01-25 15:59:26,205 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 16:07:09,893 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 16:15:03,602 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 17:58:23,676 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-01-25 17:58:26,190 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-01-25 18:22:31,949 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:09:09,094 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:09:12,860 ERROR OUTPUT [BranchMaster1] cfpd0196b Aborted with return code 4
+2019-01-25 19:09:12,860 ERROR OUTPUT [BranchMaster1] Aborting all session and process
+2019-01-25 19:09:45,797 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:10:05,999 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:11:27,703 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:12:03,099 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:12:24,413 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:12:53,365 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:15:38,289 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:15:41,758 ERROR OUTPUT [BranchMaster1] cfpd0196b Aborted with return code 4
+2019-01-25 19:15:41,758 ERROR OUTPUT [BranchMaster1] Aborting all session and process
+2019-01-25 19:21:53,733 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-25 19:21:55,374 ERROR OUTPUT [] test Aborted with return code 1
+2019-01-25 19:21:55,374 ERROR OUTPUT [] Aborting all session and process
+2019-01-28 11:35:21,620 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 12:45:27,332 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:09:55,988 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:34:27,287 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:35:55,409 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:41:51,714 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:46:55,117 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:49:18,615 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:54:30,315 ERROR EXCEPTION [AWT-EventQueue-0] java.lang.NullPointerException
+2019-01-28 13:54:33,717 ERROR OUTPUT [BranchMaster1] cfpd0196b Aborted with return code 4
+2019-01-28 13:54:33,717 ERROR OUTPUT [BranchMaster1] Aborting all session and process
+2019-02-06 10:57:23,416 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-06 10:58:19,945 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-06 11:02:05,801 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-07 16:03:59,238 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-11 16:34:01,904 ERROR EXCEPTION [SwingWorker-pool-2-thread-2] 2: No such file
+2019-02-11 18:25:15,237 ERROR EXCEPTION [SwingWorker-pool-2-thread-2] 2: No such file
+2019-02-11 18:27:37,307 ERROR EXCEPTION [SwingWorker-pool-2-thread-2] 2: No such file
+2019-02-11 18:30:07,116 ERROR EXCEPTION [SwingWorker-pool-2-thread-2] 2: No such file
+2019-02-11 18:45:26,724 ERROR EXCEPTION [SwingWorker-pool-2-thread-1] 2: No such file
+2019-02-11 18:45:34,142 ERROR EXCEPTION [SwingWorker-pool-2-thread-2] 2: No such file
+2019-02-12 14:03:13,965 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.event.MenuHandlerjava.lang.NumberFormatException: For input string: "asd"
+2019-02-12 14:03:36,867 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-12 14:04:44,835 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-12 14:11:24,172 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.event.MenuHandlercom.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-12 14:13:30,789 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.event.MenuHandlercom.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-12 14:13:34,445 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.event.MenuHandlercom.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-12 14:13:38,324 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.event.MenuHandlercom.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-12 14:13:45,475 ERROR EXCEPTION [AWT-EventQueue-0] com.tcs.regrato.event.MenuHandlercom.tcs.regrato.util.NoTableFoundException: No Table Found
+2019-02-12 14:22:12,831 ERROR EXCEPTION [SwingWorker-pool-2-thread-4] 2: No such file

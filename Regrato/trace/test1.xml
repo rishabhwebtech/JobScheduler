@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<tcl:Mapper xmlns:tcl="urn:tcs:tcl" type="extract" commandFile="Path Of Trace File To Map">
+
+<tcl:wildCard>
+<tcl:wild id="SEQ" def="PIC X(03)" value="">
+<tcl:wild>
+<tcl:wild id="DD" def="PIC X(02)" value="Day">
+<tcl:wild>
+<tcl:wild id="MM" def="PIC X(02)" value="Month">
+<tcl:wild>
+
+<tcl:wild id="YY" def="PIC X(04)" value="Year">
+<tcl:wild>
+</tcl:wildCard>
+
+<tcl:Map name="job Name" pathOfFile="$data/file/SOM_${DD}_${MM}_${SEQ}.txt">
+<tcl:delimiter >no</tcl:delimiter>
+
+<tcl:field name="Inst" position="1,3">
+<tcl:fixed>
+<tcl:value >001</tcl:value>
+</tcl:fixed>
+</tcl:field>
+
+<tcl:field name="CIF_NO" position="3,19">
+<tcl:value>
+<tcl:db name="CUSM">
+<tcl:range from="" to="" ></tcl:range>
+</tcl:db>
+</tcl:value>
+</tcl:field>
+
+
+<tcl:field name="CustName" position="20,220">
+<tcl:value>
+<tcl:db name="CUSM" key="Inst,CIF_NO">CUR_NAME</tcl:db>
+</tcl:value>
+</tcl:field>
+
+</tcl:Map>
+
+</tcl:Mapper>

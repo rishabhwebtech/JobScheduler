@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<tcl:TestCase xmlns:tcl="urn:tcs:tcl" name="" path="">
+<tcl:declare>
+<tcl:declareScope name="newCommand">
+<tcl:field by="" mandatory="false" map="" name="1" type="String"/>
+</tcl:declareScope>
+</tcl:declare>
+<tcl:cases>
+<tcl:case name="newCommand">
+<tcl:run location="" value="" var="1"/>
+</tcl:case>
+</tcl:cases>
+</tcl:TestCase>

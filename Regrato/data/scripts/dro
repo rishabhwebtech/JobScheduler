@@ -1,0 +1,220 @@
+#!/bin/ksh
+#*******************************************
+# AUTHOR : RISHABH SINGH
+# DESC   : FOR DRO
+#*******************************************
+
+. setinst '001';
+input_year="";
+input_month="";
+input_day="";
+dro_date='31/08/2025';
+lenth_of_args=1;
+region=$BANCS_SYSTYPE;
+inst=$ACC_ENTITY;
+execution_time=`date +"%H:%M:%S"`;
+execution_time=$(echo $execution_time | tr ':' '.');
+log_file=$sysout/DRO.OUT.${execution_time}.txt;
+
+NONE='\033[00m'
+RED='\033[01;31m'
+GREEN='\033[01;32m'
+YELLOW='\033[01;33m'
+PURPLE='\033[01;35m'
+CYAN='\033[01;36m'
+WHITE='\033[01;37m'
+BOLD='\033[1m'
+UNDERLINE='\033[4m'
+
+if [ $lenth_of_args -eq 0 ] || [ $lenth_of_args -ge 2 ] ; then
+echo 'USAGE dro  <DATE>';
+echo 'date format dd/mm/yyyy';
+exit
+fi
+
+echo -e  "${GREEN}REGION IS $region";
+echo -e "INSTITUTION IS $ACC_ENTITY";
+
+echo -e 'DATE IS ' $dro_date ${NONE};
+
+MFLAGS_R_file="$data/file/MFLAGS";
+from_year=`cut  -c 1-4   $MFLAGS_R_file`;
+from_month=`cut -c 5-6   $MFLAGS_R_file`;
+from_day=`cut   -c 7-8   $MFLAGS_R_file`;
+
+old_year=`cut  -c  9-12   $MFLAGS_R_file`;
+old_month=`cut -c  13-14  $MFLAGS_R_file`;
+old_day=`cut   -c  15-16  $MFLAGS_R_file`;
+
+
+input_year=`echo $dro_date  | cut -c 7-10`;
+input_month=`echo $dro_date | cut -c 4-5 `;
+input_day=`echo $dro_date   | cut -c 1-2 `;
+
+echo -e "${RED}";
+reset_terminal () {
+
+tput sgr0;
+}
+
+is_valid_input_date() {
+
+if [ "$input_year" == "" ]  ; then
+
+ echo   'YEAR WRONG DATE';
+ reset_terminal;
+ exit;
+
+fi
+
+
+if [ "$input_month" != "" ]
+then
+
+ if [ $input_month -ge 13 ] ; then
+  echo  'Invalid Month ';
+  echo  'Month should be less than 12';
+  reset_terminal;
+  exit;
+ fi
+else
+ echo  'MONTH WRONG DATE';
+ reset_terminal;
+exit;
+fi
+last_date_of_month=`cal $input_month $input_year | grep -v ^$ | tail -1  | sed 's/^.* \([0-9]*\)$/\1/'`;
+month_name_in_word=`cal $input_month $input_year | grep -v ^$ | head -1 `;
+
+if [ "$input_day" != ""  ] 
+then
+
+ if [ $input_day -gt $last_date_of_month ] ; then 
+  echo  'Date is  not valid';
+  echo  $month_name_in_word ' does not have ' $input_day'th date';
+  reset_terminal
+  exit
+ fi
+else
+ echo 'DAY WRONG DATE';
+ reset_terminal
+ exit
+fi
+#input_date=$input_year"-"$input_month"-"$input_day;
+#current_date=$old_year"-"$old_month"-"$old_day;
+input_date=$input_year$input_month$input_day;
+current_date=$old_year$old_month$old_day;
+if [ $input_date -lt $current_date ]  ; then
+echo 'INPUT DATE IS LESS THEN CURRENT DATE';
+echo 'CURRENT DATE '$old_day"/"$old_month"/"$old_year;
+echo 'CANNOT PROCEED';
+reset_terminal
+exit;
+fi
+
+}
+is_valid_input_date;
+
+echo -e "${NONE}";
+old_temp_date="$old_year$old_month$old_day";
+echo $old_temp_date;
+input_temp_date="$input_year$input_month$input_day";
+echo $input_temp_date;
+echo "`sed "s/$old_temp_date/$input_temp_date/" $MFLAGS_R_file`" > $MFLAGS_R_file ;
+
+#DATABASE CONNECTION
+echo 'DATABASE CONNECTION ESTABLISHMENT...';
+echo 'DATABASE CONNECTION ESTABLISHMENT...' >> $log_file;
+db2 connect to $DB2_SID >>  $log_file;
+
+echo 'DRO FOR AMBANK';
+echo 'REGION IS '$region;
+echo 'RUNNING JOBS '; 
+
+echo -e "${GREEN}";
+dro_jobs () {
+
+echo "RUNNING JOB CFPD0006";
+echo "RUNNING JOB CFPD0006" >> $log_file;
+cfpd0006 <<< $'YES'  >> $log_file;
+
+echo "DELETING JOURNALS..";
+echo "DELETING JOURNALS.." >> $log_file;
+
+if [ "$inst" == "001" ] ; then
+echo "DELETING  JOURNALS JR01";
+echo "DELETING  JOURNALS JR01" >> $log_file;
+db2 "truncate table jr01" >> $log_file;
+echo "DELETING  JOURNALS JR02";
+echo "DELETING  JOURNALS JR02" >> $log_file;
+db2 "truncate table jr02" >> $log_file;
+echo "DELETING  JOURNALS JR03";
+echo "DELETING  JOURNALS JR03" >> $log_file
+db2 "truncate table jr03" >> $log_file;
+echo "DELETING  JOURNALS JR04";
+echo "DELETING  JOURNALS JR04" >> $log_file;
+db2 "truncate table jr04" >> $log_file;
+fi
+
+if [ "$inst" ==  "002" ] ; then
+echo "DELETING  JOURNALS JR05";
+echo "DELETING  JOURNALS JR05" >> $log_file;
+db2 "truncate table jr05" >> $log_file;
+echo "DELETING  JOURNALS JR06";
+echo "DELETING  JOURNALS JR06" >> $log_file;
+db2 "truncate table jr06" >> $log_file;
+echo "DELETING  JOURNALS JR07";
+echo "DELETING  JOURNALS JR07" >> $log_file;
+db2 "truncate table jr07" >> $log_file;
+echo "DELETING  JOURNALS JR08";
+echo "DELETING  JOURNALS JR08" >> $log_file;
+db2 "truncate table jr08" >> $log_file;
+fi
+
+echo "RUNNING JOB CFPD3001";
+echo "RUNNING JOB CFPD3001" >> $log_file;
+cfpd3001 <<< $'YES'  >>  $log_file;
+echo -e "${NONE}";
+echo "BANKS KILL"; 
+echo "BANKS KILL" >> $log_file;
+bancs.kill <<< $'\n'  >> $log_file;
+echo -e "${GREEN}";
+echo "RUNNING JOB CFPD0080";
+echo "RUNNING JOB CFPD0080" >> $log_file;
+cfpd0080 <<< $'YES'   >>  $log_file;
+echo "RUNNING JOB CFPD0007";
+echo "RUNNING JOB CFPD0007" >> $log_file;
+cfpd0007 <<< $'YES'  >>  $log_file;
+echo "RUNNING JOB CFPD0004";
+echo "RUNNING JOB CFPD0004" >> $log_file;
+cfpd0004 <<< $'YES'   >>  $log_file;
+
+echo "RUNNING SCB";
+echo "RUNNING SCB" >> $log_file;
+scb  >>  $log_file;
+
+echo "STARTING ONLINE APPLICATION ";
+echo "STARTING ONLINE APPLICATION " >> $log_file;
+bancs.start <<< $'Y' >> $log_file;
+
+current_date_in_system=`grep "SYSTEM DATE" $log_file  | cut -c 21-28`;
+input_combin_date=$input_year$input_month$input_day;
+
+echo "CURRENT SYSTEM DATE "$current_date_in_system;
+echo "INPUT DATE          "$input_combin_date;
+
+if [ "$current_date_in_system" == "$input_combin_date" ]
+then
+ echo "SUCCESSFULLY DATE CHANGED TO $current_date_in_system";
+else
+ echo -e "${RED}";
+ echo "FAILED TO CHANGE DATE SEE ERROR LOGS";
+fi
+
+ echo -e "${YELLOW}";
+echo "LOGS GENERATED IN SYSOUT DIRECTORY  " $log_file;
+echo "COMPLETION SUCCESSFULL";
+
+}
+
+dro_jobs;
+reset_terminal;

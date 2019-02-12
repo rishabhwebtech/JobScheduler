@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mapper colLength="3" del="false" rowLength="2">
+<header/>
+<body>
+<field size="40">Name</field>
+<field size="40">Address</field>
+</body>
+<footer/>
+</mapper>

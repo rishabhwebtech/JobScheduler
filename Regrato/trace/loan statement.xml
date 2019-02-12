@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<tcl:TestCase xmlns:tcl="urn:tcs:tcl" name="LOAN STATEMENT JOBS" path="">
+<tcl:declare>
+<tcl:declareScope name="loan_statement">
+<tcl:field by="mode" map="C" name="1" type="String"/>
+<tcl:field by="mode" map="C" name="2" type="String"/>
+<tcl:field by="mode" map="C" name="3" type="String"/>
+<tcl:field by="mode" map="C" name="4" type="String"/>
+<tcl:field by="mode" map="C" name="5" type="String"/>
+<tcl:field by="mode" map="C" name="6" type="String"/>
+</tcl:declareScope>
+</tcl:declare>
+<tcl:cases>
+<tcl:case name="loan_statement">
+<tcl:run location="BranchMaster1" value="cfpd3008" var="1"/>
+<tcl:run location="BranchMaster1" value="lond0501 -t" var="2"/>
+<tcl:run location="BranchMaster1" value="lond0813" var="3"/>
+<tcl:run location="BranchMaster1" value="ambd3000" var="4"/>
+<tcl:run location="BranchMaster1" value="ambd1000" var="5"/>
+<tcl:run location="BranchMaster1" value="cfpd0196b" var="6"/>
+</tcl:case>
+</tcl:cases>
+</tcl:TestCase>

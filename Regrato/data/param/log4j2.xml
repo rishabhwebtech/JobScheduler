@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration status="WARN">
+    <properties>
+        <property name="logMsgPattern">%d [%t] %-5level: %msg%n%throwable</property>
+        <property name="logDir">host_run_output</property><!-- ${sys:testLogDir} -->
+    </properties>
+    <appenders>
+   <!--      <Console name="Console" target="SYSTEM_OUT">           
+            <PatternLayout pattern="${logMsgPattern}"/>
+         </Console> -->
+
+        <Routing name="Routing">
+                    <Routes pattern="$${ctx:threadId}">             
+                        <Route>
+                            <RollingFile name="RollingFile-${ctx:threadId}" fileName="${logDir}/${ctx:threadId}.log" filePattern="${logDir}/%d{yyyy-MM-dd}/archived_%d{HH-mm}-${ctx:threadId}.log">
+                                    <PatternLayout pattern="${logMsgPattern}"/>
+                                    <Policies>
+                                <OnStartupTriggeringPolicy />
+                            </Policies> 
+                           </RollingFile>
+                        </Route>
+                    </Routes>
+         </Routing>
+		<File name="ExceptionHandler" fileName="error_logs/regrato.log">
+          <PatternLayout>
+            <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+          </PatternLayout>
+         </File>
+         <Async name="Async">
+          <AppenderRef ref="ExceptionHandler"/>
+         </Async>
+    </appenders>
+
+    <loggers>               
+        <root level="debug">
+            <appender-ref ref="Console" level="debug" />
+            <appender-ref ref="Routing" level="debug"/>
+			<appender-ref ref="Async" level="error"/>
+        </root>                     
+    </loggers>  
+</configuration>

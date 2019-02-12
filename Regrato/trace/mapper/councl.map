@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mapper colLength="3" del="false" rowLength="15">
+<header/>
+<body>
+<field size="2">Notice Indicator</field>
+<field size="40">Customer Name</field>
+<field size="40">Address line 1</field>
+<field size="40">Address line 2</field>
+<field size="40">Address line 3</field>
+<field size="40">Address line 4</field>
+<field size="10">Post Code</field>
+<field size="30">State Code</field>
+<field size="12">Cashiers Order Number</field>
+<field size="8">Date</field>
+<field size="8">Due Date</field>
+<field size="8">Issue Date</field>
+<field size="24">Amount</field>
+<field size="40">Payee Name 1</field>
+<field size="40">Payee Name 2</field>
+</body>
+<footer/>
+</mapper>

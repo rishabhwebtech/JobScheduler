@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<tcl:TestCase xmlns:tcl="urn:tcs:tcl" name="Parraller After EOD Testing" path="">
+<tcl:declare>
+<tcl:declareScope name="newCommand_1">
+<tcl:field by="mode" map="C" name="3" type="String"/>
+<tcl:field by="mode" map="C" name="1" type="String"/>
+<tcl:field name="2" type="String"/>
+</tcl:declareScope>
+</tcl:declare>
+<tcl:cases>
+<tcl:case name="newCommand_1">
+<tcl:run location="BranchMaster1" value="ambd1000" var="3"/>
+<tcl:run location="BranchMaster2" value="ambd2000" var="1"/>
+<tcl:run location="C" value="ambd3000" var="2"/>
+</tcl:case>
+</tcl:cases>
+</tcl:TestCase>

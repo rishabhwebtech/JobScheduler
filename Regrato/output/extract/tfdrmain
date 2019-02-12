@@ -1,0 +1,2685 @@
+D"
+bin_date=`db2 -x "select to_char(to_date(${dateyyyymmdd},'YYYYMMDD'),'J')-2415020+1 from dual"`
+echo "bin_date fetch:" $bin_date
+greg_dt=`db2 -x "select to_char(to_date(sum(2415020+$bin_date),'J'),'DDMMYYYY') from dual"`
+echo "greg date fetch:" $greg_dt
+echo "sagar before grep date1" `echo $greg_dt|cut -c 1-8`
+#ADDED FOR MAA AND MAA TAKAFUL AUTODEBIT AUTO DEBIT FILE PROCESSING
+yymmdd=`cut -c 11-12 $data/file/MFLAGS``cut -c 13-14 $data/file/MFLAGS``cut -c 15-16 $data/file/MFLAGS`
+#MAA AND MAA TAKAFUL END.
+# Onsite Change for Trickle Feed Response File####
+
+### ****  Diving Arguments Complete *** ###
+#MOVING FILE FROM TRICKLEFEEDREPORT TO RESPECTIVE FOLDER###
+SOURCE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_DEB_RES_"${dateddmmyyyy}
+#SOURCE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_DEBIT_RES_"${dateddmmyyyy}
+SRC=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"SUCSS.txt"
+SRC1=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"REJ.txt"
+SRC2=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"CRPACCCPT.txt"
+SRC3=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"CRPREJCT.txt" 
+SRC4=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"ADEXTRSUC.txt"
+SRC5=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"ADEXTRREJ.txt"
+SORCE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"MBS_CREDIT_RES_"${dateddmmyyyy} 
+FIRRES=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_DEB_RES_"${dateddmmyyyy}
+AMLDES=$spool/interfaces/out/amlife/
+AMPRES=$spool/interfaces/out/amp/
+AMBRES=$spool/interfaces/out/amab/
+#TAKRES=$spool/interfaces/out/takf/
+TAKRES=$spool/interfaces/out/amt/
+MBSRES=$spool/interfaces/out/mbs/
+AMURES=$spool/interfaces/out/amut/
+CRPRES=$spool/interfaces/out/crp/
+MAARES=$spool/interfaces/out/maa/
+MATRES=$spool/interfaces/out/maat/
+AEORES=$spool/interfaces/out/aeon/
+GPYRES=$spool/interfaces/out/gpy/
+IFTRES=$spool/interfaces/out/ift/
+PRLRES=$spool/interfaces/out/prul/
+PRGRES=$spool/interfaces/out/prug/
+FWURES=$spool/interfaces/out/fwu/
+ATDRES=$spool/interfaces/out/adb/
+SCMRES=$spool/interfaces/out/scm/
+
+################### *** FUNC: Update table TFFM *** ###
+UPDATE_TABLE_TFFM() {
+###################
+if [ $BANCS_DB_TYPE = ORA ] ; then
+sqlplus -s \/ << EOF
+WHENEVER SQLERROR EXIT 99
+update tffm set status = '${tffm_status}', replica_no = '${replica_no}'
+where INST_NO='${inst_no}' and DT='${today_dt}' and TIME='${file_time}' 
+and FILE_NO=${file_no};
+commit;
+exit;
+EOF
+elif [ $BANCS_DB_TYPE = DB2 ] ; then
+db2 -s << EOF
+db2 connect to $DB2_SID
+update tffm set status = '${tffm_status}', replica_no = '${replica_no}'
+where INST_NO='${inst_no}' and DT='${today_dt}' and TIME='${file_time}'
+and FILE_NO=${file_no}
+commit
+quit
+EOF
+fi
+echo "purva:tffmupdate"
+echo "status" ${tffm_status} ":" "replica_no :" ${replica_no}
+if [ $? -ne 0 ]; then
+   echo "TFFM: Error in Status Updation to "  $tffm_status " for " $file_name
+   exit 1
+fi
+echo "TFFM: Status " $tffm_status " Time " `date` 
+}
+################### *** FUNC: Update table TFFM Complete *** ###
+
+
+
+################### *** FUNC: Update Table TFRM *** ###
+UPDATE_TABLE_TFRM() {
+###################
+if [ $BANCS_DB_TYPE = ORA ] ; then
+sqlplus -s \/ << EOF
+WHENEVER SQLERROR EXIT 99
+update tfrm set run_stop='${tfrm_status}' where replica_no = '${replica_no}';
+commit;
+exit;
+EOF
+elif [ $BANCS_DB_TYPE = DB2 ] ; then
+db2 -s << EOF
+connect to $DB2_SID
+update tfrm set run_stop='${tfrm_status}' where replica_no = '${replica_no}'
+commit
+quit
+EOF
+fi
+echo "purva:tfrmupdate"
+if [ $? -ne 0 ]; then
+   echo "TFRM: Error in Status Updation to status " ${tfrm_status}
+   exit 1
+fi
+}
+#################### *** FUNC: Update Table TFRM Complete *** ###
+
+
+
+#################### *** FUNC: Start Area Creation *** ###
+STARTAREA_CREATION() {
+####################
+
+export DD_MFLAGS=$data/file/MFLAGS
+export DD_MNMPARAM=$data/params/MNMPARAM
+export DD_INSPARAM=$data/params/INSPARAM
+export DD_VCCPARAM=$data/params/VCCPARAM
+export DD_CMSEXTR01=$data/temp/CMSEXTR01.txt
+export DD_CMSEXTR02=$data/temp/CMSEXTR02.txt
+export DD_CMSEXTR03=$data/temp/CMSEXTR03.txt
+export DD_FLATFILECMS=$data/temp/FLATFILECMS
+export DD_TFDICARD=$card/TFMDDI.card
+export DD_TFMRPP=$card/TFMRPP.card
+
+currency=`echo $currency |sed -e "s/ //g"`
+
+#----ADDING CAODE TO PASS IDENTIFIER FOR CMS FILE TO ----------#
+file_type=`echo $file_name | cut -d_ -f6 | cut -c 1-3`
+export TFM_FILE_TYPE=${file_type}
+echo "file type " $TFM_FILE_TYPE
+#---ADDING THE CODE TO PASS THE CORRECT ENTITY FOR ICS SPICK FILE------#
+batch_no=`echo $file_name | cut -d_ -f6 | cut -c 1-3`
+export TFM_BATCH_NO=${batch_no}
+
+export TFM_STRT_ARG=${inst_no}${today_dt}${curr_time}${file_no}${replica_no}${upld_tp}${brch_no}${currency}${lang}${file_time}${tffm_status}${file_name}
+
+echo "TFM_STRT_ARG " $TFM_STRT_ARG
+echo "lang " $lang
+echo "currency " $currency
+echo "upload type:" $upld_tp
+    
+case $upld_tp in
+
+ERU)
+        export DD_WPDEXCHRATEFILE=$file_path_name
+        export DD_DUMMYRATEFILE=$data/temp/DUMMY_EXCHANGE_RATE.txt
+        run.sh -f TFMERU
+        exit_code=$?
+        ;;
+
+SAL|PNS|CPN|CMP|EDI|TFS|ACE|TTP|OFR) 
+        export DD_SALARY=$file_path_name
+        run.sh -f TFMPNS
+        exit_code=$?
+        ;;
+CDA|CVA)
+        export DD_DEPACCTCREATE=$file_path_name
+        run.sh -f TFMCDA
+        exit_code=$?
+        ;;
+SEC)    export DD_CLOSEACT=$file_path_name
+        run.sh -f TFMSEC
+        exit_code=$?
+        ;;
+
+URF)    export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+
+AKP|AHL)
+        export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+
+TKM)
+        export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+
+CAG)
+        echo "replica no for cag"  $replica_no 
+        export DD_CAGAMASFILE1=$file_path_name
+        export DD_THIRDPARTYSUC=$data/file/THIRDPARTYSUC
+        export DD_CAGREJFILE=$data/file/CAGREJFILE
+      run.sh -f TFMCAG
+      exit_code=$?
+      ;;
+
+KOP)
+        export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+KPS)
+        export DD_REPAYFILE=$file_path_name
+#        cardfile=$card/AM0620.card
+#        tranbr=$( tail -1 $cardfile | grep "SPEC0" | cut -d: -f8)
+#        tranbr=`echo $tranbr | cut -c 7-12`
+#        export TRAN_BR_NO=${tranbr}
+        run.sh -f TFMKPS
+        exit_code=$?
+        ;;
+REF)
+        export DD_REFUNDFILE=$file_path_name
+        run.sh -f TFMREF
+        exit_code=$?
+        ;;
+
+AMS)
+        echo 'calling tfmams'    
+        export DD_AMEZTRADE=$file_path_name
+        run.sh -f TFMAMS
+        exit_code=$?
+        echo 'exit code for tmfams' $exit_code 
+        ;;
+
+AHR)
+        export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+
+PET)
+        export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+
+PTO)
+        export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+
+
+TMF)
+        export DD_REPAYFILE=$file_path_name
+        run.sh -f TFMURF
+        exit_code=$?
+        ;;
+      
+CIL) 
+        export DD_CILFILE=$file_path_name
+        run.sh -f TFMCIL
+        exit_code=$?
+        ;;
+
+CIF)
+        export DD_PRTFDATA=$file_path_name
+      run.sh -f TFMCIF
+      exit_code=$?
+      ;;
+LON)
+        export DD_LONCREATE=$file_path_name
+        run.sh -f TFMLON
+        exit_code=$?
+        ;;
+LAC)
+        export DD_LACCREATE=$file_path_name
+        run.sh -f TFMLAC
+        exit_code=$?
+        ;;
+COL)
+        export DD_COLLCREAT=$file_path_name
+        run.sh -f TFMCOL
+        exit_code=$?
+        ;;
+
+BLR)
+        export DD_BLRFILE=$file_path_name
+        run.sh -f TFMBLR
+        exit_code=$?
+        ;;
+LO1)
+        export DD_ADVNFILE=$file_path_name
+      run.sh -f TFMLO1
+      exit_code=$?
+      ;;
+      
+IAN) 
+        export DD_IANFILE=$file_path_name
+        run.sh -f TFMIAN
+        exit_code=$?
+        ;;
+
+ICL) 
+        export DD_ICLFILE=$file_path_name
+#       run.sh -f TFMICL
+        run.sh -f TFMICA 
+        exit_code=$?
+        ;;
+
+BPC) 
+        export DD_BPCFILE=$file_path_name
+        run.sh -f TFMBPC
+        exit_code=$?
+        ;;
+
+LIM|APP|ACP) 
+        export DD_LIMFILE=$file_path_name
+        run.sh -f TFMLIM
+        exit_code=$?
+        ;;
+
+DIS) 
+        export DD_DISFILE=$file_path_name
+        run.sh -f TFMDIS
+        exit_code=$?
+        ;;
+
+OCL)
+        export TFM_CLRG_ARG=${file_name}
+        export DD_OCLFILE=$file_path_name
+        run.sh -f TFMOCL
+        exit_code=$?
+        ;;
+
+DOC)
+        export TFM_CLRG_ARG=${file_name}
+        export DD_DOCFILE=$file_path_name
+        run.sh -f TFMDOC
+        exit_code=$?
+        ;;
+LOC)
+        export TFM_CLRG_ARG=${file_name}
+        export DD_LOCFILE=$file_path_name
+        run.sh -f TFMLOC
+        exit_code=$?
+        ;;
+
+SCM)
+      export TFM_CLRG_ARG=${file_name}
+      export DD_SCMFILE=$file_path_name
+      run.sh -f TFMSCM
+      exit_code=$?
+      ;;
+
+CUD)
+      export TFM_CLRG_ARG=${file_name}
+      export DD_CUDFILE=$file_path_name
+      run.sh -f TFMCUD
+      exit_code=$?
+      ;;
+
+AIC)
+        export TFM_CLRG_ARG=${file_name}
+        export DD_AICFILE=$file_path_name
+        export DD_IMAIRFILE=$spool/interfaces/in/cms/CMS_ACC_NO_${dateddmmyyyy}.txt
+        export DD_BRCHLIST=$data/temp/BRCHLIST.txt
+        export DD_CMSFILE=$spool/interfaces/out/ics/CMSPICK.txt
+       # export DD_AMUTRECFILE=$data/temp/AMUTRECFILE.txt
+        export DD_AMUTRECFILE=$data/temp/AMUTRECFILE_${batch_no}_`date +%H%M%S`.txt
+        export DD_DATAFILE=$data/temp/SPICKTEMP_${batch_no}.txt
+        db2 export to $DD_BRCHLIST of del modified by nochardel "select substr(key_1,4,16)||substr(bsb,1,7) from brhm where bsb <> ' '"
+
+	run.sh -f TFMAIC
+        exit_code=$?
+        ;;
+ACR) 
+        export TFM_CLRG_ARG=${file_name}
+        export DD_ACRFILE=$file_path_name
+        echo "CLRG ARG" ${file_name}
+        echo "ACRFILE" $file_path_name 
+        export DD_ACRREJFILE=$data/file/ACRREJFILE
+        export DD_ACRINPUTFILE=$data/file/ACRINPUTFILE
+        run.sh -f TFMACR
+        exit_code=$?
+        ;;
+COC)
+        export TFM_CLRG_ARG=${file_name}
+        export DD_COCFILE=$file_path_name
+        run.sh -f TFMCOC
+        exit_code=$?
+        ;;
+
+BUL)
+        export DD_BULFILE=$file_path_name
+        run.sh -f TFMBUL
+        exit_code=$?
+        ;;
+
+IWC)
+        export DD_IWCFILE=$file_path_name
+        run.sh -f TFMIWC
+        exit_code=$?
+        ;;
+
+VDP)
+        export DD_VOSTRO=$file_path_name
+        run.sh -f TFMVDP
+        exit_code=$?
+        echo "Testing " $exit_code
+        ;;
+REM) 
+        export DD_REMFILE=$file_path_name
+        run.sh -f TFMREM
+        exit_code=$?
+        ;;
+FCT)   
+        export DD_FACTPURCHASE=$file_path_name
+      run.sh -f TFMFCT
+      exit_code=$?
+      ;;
+FEE)
+        export DD_FEE=$file_path_name
+        run.sh -f TFMFEE
+        exit_code=$?
+        ;;
+INT)
+        export DD_INTRST=$file_path_name
+        run.sh -f TFMINT
+        exit_code=$?
+        ;;
+TRF|ADT|ABT|AML|CRP|AMP|AMA|TAK|AMU|MBS|AMB|GPY|PRL|PRG|MAA|MAT|AEO|EAL|EZT|AKK|MAN|AEU|ATD)
+        export DD_TRFINPUT=$file_path_name
+      run.sh -f TFMTRF
+      exit_code=$?
+      ;;
+OWC)
+      export DD_OWCINPUT=$file_path_name
+      run.sh -f TFMOWC
+      exit_code=$?
+       ;;
+IDH)
+      export DD_IDHINPUT=$file_path_name
+      run.sh -f TFMIDH
+      exit_code=$?
+       ;;
+AUC)
+      export DD_AUC=$file_path_name
+      run.sh -f TFMAUC
+      exit_code=$?
+      ;;
+FRV)
+      export DD_FRV=$file_path_name
+      run.sh -f TFMFRV
+      exit_code=$?
+      ;;
+SEQ)
+      export DD_SECURITZ=$file_path_name
+      run.sh -f TFMSEQ
+      exit_code=$?
+      ;;
+RPU)
+      export DD_REPURCHA=$file_path_name
+      run.sh -f TFMRPU
+      exit_code=$?
+      ;;
+SEZ)
+      export DD_CLOSEACT=$file_path_name
+      run.sh -f TFMSEC
+      exit_code=$?
+      ;;                        
+CMS)
+      export DD_DRCRFILE=$file_path_name
+      run.sh -f TFDRCR
+      exit_code=$?
+      ;;
+CMN)
+      export DD_DRCRFILE=$file_path_name
+      run.sh -f TFDRCN
+      exit_code=$?
+      ;;
+RMC)
+      export DD_TEMPFILE=$data/file/RMCTEMPFILE
+      export DD_RMCCREATE=$file_path_name
+      run.sh -f TFMRMC
+      exit_code=$?
+      ;;
+NET)
+      export DD_STARFILE=$file_path_name
+      run.sh -f TFMNET
+      exit_code=$?
+      ;;
+NEX)
+      export DD_TRFNEXINPUT=$file_path_name
+      run.sh -f TFMNEX
+      exit_code=$?
+      ;;
+CLS)
+        export DD_IFAEXC=$file_path_name
+      run.sh -f TFMCLS
+      exit_code=$?
+      ;;
+BSL)
+      export DD_SEPVFILE=$file_path_name
+      BASEL_FILE_TYPE=1;
+      tempBaselFileType2=$(echo $file_path_name | grep "_00002_");
+      if [ ${#tempBaselFileType2} -gt 0 ] ; 
+      then
+         BASEL_FILE_TYPE=2;
+      fi
+      echo "BASEL FILE TYPE " $BASEL_FILE_TYPE;
+      export BASEL_FILE_TYPE;
+      run.sh -f TFMBSL
+      exit_code=$?
+      ;;
+CTP)
+      export DD_BLACKLISTED=$file_path_name
+      run.sh -f TFMCTP
+      ;;
+FWU)
+      export DD_MONX11299=$file_path_name
+      export DD_REJOUTPUT=$data/temp/FWUREJREP     
+      run.sh -f TFMFWU
+      exit_code=$?
+      ;;
+ORD)
+      export DD_ORDEFILE=$file_path_name
+      export DD_REJOUTPUT=$data/temp/REJECTFILE   
+      run.sh -f TFMORD
+      exit_code=$?
+      ;;
+RML)
+      export DD_RMLFILE=$file_path_name
+      run.sh -f TFMRML
+      exit_code=$?
+      ;;
+SPL)  
+      export DD_SPLRFILE=$file_path_name
+      run.sh -f TFRSPL
+      exit_code=$?
+      ;;
+VSA|DBC|SHR|ATM|MDC)
+      export DD_VSAFILE=$file_path_name
+      run.sh -f TFMVSA
+      exit_code=$?
+      ;;
+
+AMW)
+      export DD_AMWINSINP=$file_path_name
+      run.sh -f TFMAMW
+      exit_code=$?
+      ;;
+AMM)
+      export DD_AMMINSINP=$file_path_name
+      echo $DD_AMMINSINP
+      run.sh -f TFMAMM
+      exit_code=$?
+      ;;
+AMR)
+      export DD_AMMRRINP=$file_path_name
+      echo $DD_AMMRRINP
+      run.sh -f TFMAMR
+      exit_code=$?
+      ;;
+CPA)
+      export DD_CPACCEPT=$file_path_name
+      run.sh -f TFMCPA
+      exit_code=$?
+      ;;
+IPA)
+      export DD_IPACCEPT=$file_path_name
+      run.sh -f TFMIPA
+      exit_code=$?
+      ;;
+PWF)
+      export DD_PWFFILE=$file_path_name
+      run.sh -f TFMPWF
+      exit_code=$?
+      ;;
+FWF)
+      export DD_FWFFILE=$file_path_name
+      run.sh -f TFMFWF
+      exit_code=$?
+      ;;
+HRF|SSD|SSC)
+      echo "going to execute TFINIQ "
+      export DD_HRFFILE=$file_path_name    
+      export DD_SSDFILE=$file_path_name
+      export DD_SSCFILE=$file_path_name
+      echo $file_path_name 
+      echo "TFINIQ is getting called"
+      run.sh -f TFINIQ
+      exit_code=$?
+      ;;
+      DBD)
+      export DD_DBDFILE=$file_path_name
+      run.sh -f TFMDBD
+      exit_code=$?
+      ;;
+LBD)
+      export DD_LBDFILE=$file_path_name
+      run.sh -f TFMLBD
+      exit_code=$?
+      ;;
+LOC)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh TRFOC3 ${replica_no}
+      ;;
+PDC)
+      echo "going to execute TFINIQ "
+      export DD_PDCFILE=$file_path_name
+      echo $file_path_name
+      echo "TFPDCP is getting called"
+      run.sh -f TFPDCP
+      exit_code=$?
+      ;;
+CHQ)
+    echo "going to execute TFMCHQ "
+    export DD_CHQISSUEFILE=$file_path_name
+    run.sh -f TFMCHQ
+    exit_code=$?
+    ;;
+FCY)
+    export DD_FYCACTFILE=$file_path_name
+    run.sh -f FCAACT
+    exit_code=$?
+    ;;    
+VFT)
+    echo "going to execute TFMVFT"
+    export DD_VFTINPUT=$file_path_name
+    echo " file path for VFT " $file_path_name
+    echo " executed : TFMVFT"
+    run.sh -f TFMVFT
+    exit_code=$?
+    ;;
+
+WMS)
+    echo "going to execute TFDWMS "
+    export DD_WMSFILE=$file_path_name
+    echo " file path for WMS " $file_path_name
+    run.sh -f TFMWMS
+    exit_code=$?
+    ;;
+
+DDI)
+    echo "going to execute TFMDDI "
+    export DD_DDIFILE=$file_path_name
+    echo " file path for DDI " $file_path_name
+    run.sh -f TFMDDI
+    exit_code=$?
+    echo " exit TFMDDI " $exit_code    
+    ;;
+
+ANC)
+    echo "going to execute TFMANC"
+    export DD_ANCINPUT=$file_path_name
+    echo " file path for ANC " $file_path_name
+    echo " executed : TFMANC"
+    run.sh -f TFMANC
+    exit_code=$?
+    ;;
+
+SWP)
+    echo "going to execute TFMSWP"
+    export DD_SWPINPUT=$file_path_name
+    echo " file path for SWP " $file_path_name
+    echo " executed : TFMSWP"
+    run.sh -f TFMSWP
+    exit_code=$?
+    ;;
+
+ICF|ICR)
+    echo "going to execute TFMICF"
+    export DD_IFTPROMO=$card/IFTPRO.card
+#   export DD_ICFFILE=$spool/ICFFILENAMES_$curr_date
+#   export DD_ICRFILE=$spool/ICRFILENAMES_$curr_date
+    export DD_ICFINPUT=$file_path_name
+    echo " file path for ICF " $file_path_name
+    echo " executed : TFMICF"
+    run.sh -f TFMICF
+    exit_code=$?
+    ;;
+
+
+VAC)
+    echo "going to execute TFMVAC"
+    export DD_VACINPUT=$file_path_name
+    echo " file path for VAC " $file_path_name
+    echo " executed : TFMVAC"
+    run.sh -f TFMVAC
+    exit_code=$?
+    ;;
+
+
+RPP)
+    echo "going to execute TFMRPP"
+    export DD_RPPFILE=$file_path_name
+    echo " file path for RPP " $file_path_name
+    run.sh -f TFMRPP
+    exit_code=$?
+    ;;
+
+
+RPR)
+    echo "going to execute TFMRPR"
+    export DD_RPRFILE=$file_path_name
+    echo " file path for RPR " $file_path_name
+    run.sh -f TFMRPR
+    exit_code=$?
+    ;;
+
+ADV)
+    echo "going to execute TFMADV"
+    export DD_ADVPROFITFILE=$file_path_name
+    echo " file path for ADV " $file_path_name
+    run.sh -f TFMADV
+    exit_code=$?
+    ;;
+
+GLO)
+    echo "going to execute TFDGLO "
+    export DD_GLOFILE=$file_path_name
+    echo " file path for GLO " $file_path_name
+    run.sh -f TFMGLO
+    exit_code=$?
+    echo " exit TFMGLO " $exit_code
+    ;;
+
+ 
+esac
+
+if [ "$exit_code" -eq "0" ]
+then
+   echo "******StartArea formation completed sucessfully******"
+else
+#   tffm_status=97
+#   UPDATE_TABLE_TFFM
+#   tfrm_status=S
+#   UPDATE_TABLE_TFRM
+   exit $exit_code
+   echo "******Error Creating Start-Area*****"
+fi
+}
+###################### *** FUNC: Start Area Creation Complete*** ###
+
+
+
+###################### *** FUNC: TFCONS Call *** ###
+MAIN_LINE_PROCESSING() {
+######################
+
+#tffm_status=20
+#UPDATE_TABLE_TFFM
+
+export TABLE_NO=${replica_no}
+#mv $sysout/RR0000.${BANCS_HOSTNO}.TF${replica_no} $sysout/RR0000.TF${replica_no}.BACKUP
+mv $sysout/RR0000.${BANCS_HOSTNO}.TF${replica_no} $sysout/RR0000.`date +%m%d%H%M%S`.TF${replica_no}
+
+rm $data/temp/TFCON730.TF${replica_no}
+touch $data/temp/TFCON730.TF${replica_no}
+echo "0903" >> $data/temp/TFCON730.TF${replica_no}
+echo "0730" >> $data/temp/TFCON730.TF${replica_no}
+echo "TF${replica_no}" >> $data/temp/TFCON730.TF${replica_no}
+echo "0999" >> $data/temp/TFCON730.TF${replica_no}
+echo "0999" >> $data/temp/TFCON730.TF${replica_no}
+ 
+export DD_APPPARAM=$data/params/APPPARAM
+export DD_INSPARAM=$data/params/INSPARAM
+export DD_MFLAGS=$data/file/MFLAGS
+export FNS_REMOTE=Y
+#export DD_REMOTE=$sysin/TFCON730
+export DD_REMOTE=$data/temp/TFCON730.TF${replica_no}
+export DD_DAYPARAM=$data/params/DAYPARAM
+export DD_MFLAGS=$data/file/MFLAGS
+export DD_XIBTFILE=$data/file/XIBTFILE.`date +%y%m%d`
+export DD_BNCONSF1=$data/temp/BNCONSF1
+export DD_RPSPARAM=$data/params/RPSPARAM
+export DD_GRPPARAM=$data/params/GRPPARAM
+export DD_UTLPARAM=$data/params/UTLPARAM
+export DD_GLACPARM=$data/params/GLACPARM
+
+$sh/run.sh -2 TFCONS
+
+#Bibekl: Bug : 78992.Adding sleep of 30 Seconds after TFCONS submit.Server sometimes take more than 10 seconds to initiate RR0000 program
+#        and below validation failed and SUSPENDED The process. 
+ sleep 30
+#Bibekl: Changes End. Bug: 78992 
+
+#tfcons <<EOF 2>$sysout/TFCONS.${replica_no}.Exceptions.out
+#903
+#730
+#TF${replica_no}
+#999
+#999
+#EOF
+      exit_code=0
+      abrt_val=0
+      test -f  $sysout/RR0000.${BANCS_HOSTNO}.TF${replica_no}
+      abrt_val=$?
+      if test "$abrt_val" = 1
+      then 
+       exit_code=1
+       echo "TRICKLE FEED PROCESS SUSPENDED IN TFCONS"
+       tfrm_status=K
+       UPDATE_TABLE_TFRM
+       exit $exit_code
+      fi
+      if test "$exit_code" = 0
+      then
+      abrt_val=0
+      grep 'TRICKLE FEED PROCESSING ENDED O.K' $sysout/RR0000.${BANCS_HOSTNO}.TF${replica_no}
+      fin_val=$?
+      #echo $fin_val
+      while [ $fin_val != 0 ]
+      do
+        sleep 1
+      grep 'TRICKLE FEED PROCESSING ENDED O.K' $sysout/RR0000.${BANCS_HOSTNO}.TF${replica_no}
+      fin_val=$?
+      #echo $fin_val
+      if test "$fin_val" != 0
+      then
+        grep 'ABORTING' $sysout/RR0000.${BANCS_HOSTNO}.TF${replica_no}
+        abrt_val=$?
+        fin_val=$abrt_val
+        if test "$abrt_val" = 0
+        then
+          exit_code=1
+        fi
+      fi
+      done
+      fi
+}
+################# *** FUNC: TFCONS Call Complete *** ###
+
+
+
+################# *** FUNC: Report Generation Prog *** ###
+REPORT_CREATION() {
+#################
+
+#tffm_status=30
+#UPDATE_TABLE_TFFM
+
+export DD_MFLAGS=$data/file/MFLAGS
+export DD_MNMPARAM=$data/params/MNMPARAM
+export DD_INSPARAM=$data/params/INSPARAM
+export DD_VCCPARAM=$data/params/VCCPARAM
+export DD_ERMPARAM=$data/params/ERMPARAM
+export DD_LONFILE=$data/temp/LONFILE
+export DD_EXTRFILE=$data/temp/EXTRFILE
+export DD_ADVNFILE=$data/temp/ADVNFILE
+export DD_REPAYFILE=$data/temp/REPAYFILE
+export DD_CLOSEACT=$data/temp/CLOSEACT
+export DD_SWICURRC=$data/params/SWICURRC
+export DD_ATMINTERR=$data/params/ATMINTERR
+export DD_BNCINTCT=$data/params/SWICURRC3
+export DD_GRPPARAM=$data/params/GRPPARAM
+export DD_UPLOADFL=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/PRTF_${report_name}
+export DD_PRINTF1=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_"${report_name}
+# Onsite Change for Trickle Feed Response File####
+export DD_TFEXTRFL=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_"${extr_name}
+# Onsite Change for Trickle Feed Response File####
+export DD_FILE1=${upld_tp}"_"${report_name}
+export DD_PRINTF2=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+export DD_PRINTF3=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_failed_"${report_name}
+export DD_REPAYREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_"${report_name}
+export DD_CLOSEREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_"${report_name}
+export DD_TRFOUT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_"${report_name}
+export DD_PRNTRMC1=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+export DD_PRNTRMC2=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_failed_"${report_name}
+export DD_DBDREPORT=$spool/DBDREPORT_${batch_no} 
+export DD_LBDREPORT=$spool/LBDREPORT_${batch_no} 
+export DD_KOPSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+export DD_KOPREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_KOPVARIANCE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_variance_"${report_name}
+export DD_RMSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_success"
+#export DD_AHRSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+#export DD_AHRREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_AHRSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFHRM01_01_001_${dateddmmyyyy}.txt
+export DD_AHRREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFHRM02_01_001_${dateddmmyyyy}.txt
+export DD_RMFAILURE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_failure"
+export DD_PETTEMP=$spool/Interfaces/BATCH-UPLOADS-TEMP/PETTEMP
+#export DD_PETRESPONSE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_success_"${report_name}
+#export DD_PETREJECT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_SUCREP1=$spool/SUCREP1
+export DD_FLATPET=$spool/FLATPET
+export DD_FAILREP1=$spool/FAILREP1
+export DD_VARREP1=$spool/VARREP1
+export DD_FLATPET1=$spool/FLATPET1
+export FILE_ADDRESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSVAR=$spool/interfaces/out/pet/
+export FILE_ADDRESSVAR1=$spool/interfaces/out/adb/
+export FILE_IMMONNN=$spool/interfaces/out/cms/
+export FILE_ADDRESS1=$spool/interfaces/out/scm/
+export DD_TMSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+export DD_TMREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_TMVARIANCE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_variance_"${report_name}
+export DD_PETRONATEMP=$spool/Interfaces/BATCH-UPLOADS-TEMP/PETRONATEMP
+export DD_PTOSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+export DD_PTOREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_PTOVARIANCE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_variance_"${report_name}
+export DD_CAGSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+export DD_TEMPFILE1=$spool/TEMPFILE1
+export FILE_ADDRES1=$spool/interfaces/out/cag/
+export FILE_ADDRES2=$spool/interfaces/out/ics/
+export FILE_ADDERU=$spool/interfaces/out/FCAS-FINIQ/
+#export DD_OUTFILE=$spool/interfaces/out/ics/OUTFILE.txt
+#export DD_NEWFL=$spool/interfaces/out/ics/NEWFL.txt
+#export DD_LATEOUTFILE=$spool/interfaces/out/ics/LATEOUTFILE.txt
+export DD_OUTFILE=$spool/interfaces/out/ics/OUTFILE_${batch_no}.txt
+export DD_NEWFL=$spool/interfaces/out/ics/NEWFL_${batch_no}.txt
+export DD_LATEOUTFILE=$spool/interfaces/out/ics/LATEOUTFILE_${batch_no}.txt
+export FILE_PGLIMIT=24998
+export DD_AMUTCARD=$card/TFMAIC.card
+export DD_PRUGCARD=$card/PRUREP.card
+export DD_BRCHLIST=$data/temp/BRCHLIST.txt
+export DD_DDICARD=$card/DDIREP.card
+export DD_CVACARD=$card/CVAREP.card
+#export DD_RESPFILE=$spool/interfaces/out/eal/${upld_tp}"_BILLDBCRTRANS.txt"
+#export DD_RESPFILE=$spool/interfaces/out/alert/${upld_tp}"_BILLDBCRTRANS.txt"
+#---- SCR 72752 - CHANGES FOR BANCS-DM9 INTEGRATION
+#xport DD_RESPFILE=$spool/interfaces/out/alert/BILLDBCRTRANS.txt
+export DD_RESPFILE=$spool/interfaces/out/dms/BILLDBCRTRANS.txt
+#---- SCR 72752 - CHANGES FOR BANCS-DM9 INTEGRATION
+echo "lokesh here"
+export DD_CMSSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_successful_"${report_name}
+export DD_CMSFAILURE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_failed_"${report_name}
+export DD_CMSFILEIM=$spool/interfaces/in/cms/CMS_FIN_TXN_${dateddmmyyyy}.txt
+echo "sagar before file read"  $file_type
+echo "sagar before grep date" `echo $greg_dt|cut -c 1-8`
+if [ ${file_type} -eq "001" ] ; then
+echo "MON1"
+export DD_CMSFILEIN=$spool/interfaces/in/cms/CMS_FIN_TXN_NEW_${dateddmmyyyy}.txt
+else if [ ${file_type} -eq "002" ] ; then
+echo "MON2"
+#export DD_CMSFILEIN=$spool/interfaces/in/cms/CMS_REV_TXN_NEW_${dateddmmyyyy}.txt
+export DD_CMSFILEIN=$spool/interfaces/in/cms/CMS_REV_TXN_NEW_`echo $greg_dt|cut -c 1-8`.txt
+else if [ ${file_type} -eq "003" ] ; then
+echo "MON3"
+export DD_CMSFILEIN=$spool/interfaces/in/cms/CMS_REV_TXN_NEW_${dateddmmyyyy}.txt
+else
+echo "MON4"
+export DD_CMSFILEIN=$spool/interfaces/in/cms/CMS_REV_TXN_IMMON2L_NEW_${dateddmmyyyy}.txt
+#export DD_CMSFILEIN=$spool/interfaces/in/cms/CMS_REV_TXN_NEW_${dateddmmyyyy}.txt
+fi
+fi
+fi
+export DD_TFRCMS01=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_success_"${report_name}
+export DD_TFRCMS02=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_fail_"${report_name}
+export DD_REPFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_DEB_RES_"${dateddmmyyyy}
+export DD_DUMMYFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/SUCSS.txt
+export DD_REJFILE1=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/REJ.txt
+export DD_ACCPTREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/CRPACCCPT.txt
+export DD_REJECTFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/CRPREJCT.txt 
+export DD_ACCPTREPRT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/ADEXTRSUC.txt
+export DD_REJCTFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/ADEXTRREJ.txt 
+# TUSHANK TESTING
+export FILE_ADDRESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/ 
+#export FILE_ADDRESSESR=$spool/interfaces/out/esr/ 
+#export FILE_ADDRESSCOOP=$spool/interfaces/out/coop/ 
+#export FILE_ADDRESSPSOFF=$spool/interfaces/out/psoff/ 
+export FILE_ADDRESSESR=$spool/interfaces/out/nep/ 
+export FILE_ADDRESSCOOP=$spool/interfaces/out/nep/ 
+export FILE_ADDRESSPSOFF=$spool/interfaces/out/nep/ 
+export FILE_ADDRESSPRUL=$spool/interfaces/out/prul/
+export FILE_ADDRESSPRUG=$spool/interfaces/out/prug/
+export FILE_ADDRESSAMW=$spool/interfaces/out/amw/
+export FILE_ADDRESSPDC=$spool/
+#export FILE_ADDRESSCHQ=$spool/  
+export FILE_ADDRESSCHQ=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+#Reports file for IA 321
+export FILE_ADDRESSCVA=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSVFT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+#export FILE_ADDRESSADV=$spool/
+export FILE_ADDRESSADV=$spool/interfaces/out/adv-profit/
+export FILE_ADDRESSANC=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSSWP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSICF=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSICR=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSVAC=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSFCY=$spool/
+export FILE_ADDRESSMDC=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSRPP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+export FILE_ADDRESSRPR=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+#below line added to cater req of IA-948
+#export CRPRES_ADDR=$spool/interfaces/out/crp/
+export DD_CREFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"MBS_CREDIT_RES_"${dateddmmyyyy}
+export DD_CLSREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_CLSREPORT__"${report_name}
+export DD_DMOFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_DMOFILE__"${report_name}
+#export DD_NETREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_NETREPORT__"${report_name}
+#export DD_BSLREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_BSLREPORT__"${report_name}
+#export DD_BSLREPORT=$spool/interfaces/out/basel/TRFBSL01
+export FILE_ADDBSL1=$spool/interfaces/out/basel/
+export DD_RWDEPFL=$spool/interfaces/out/ocs/RWDEPFL
+export DD_SWDEPFL=$spool/interfaces/out/ocs/SWDEPFL
+export FILE_ADDOCS=$spool/interfaces/out/ocs/
+export DD_RWLONFL=$spool/interfaces/out/ocs/RWLONFL
+export DD_SWLONFL=$spool/interfaces/out/ocs/SWLONFL
+export FILE_ADLONS=$spool/interfaces/out/ocs/
+export DD_CTPREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_CTPREPORT__"${report_name}
+export DD_REJINPUT=$data/temp/FWUREJREP
+export DD_CAGREJRECFILE=$data/file/CAGREJFILE
+export DD_ACRREJFILE=$data/file/ACRREJFILE
+export DD_SCMREPF=$spool/interfaces/out/scm/SCMREPF
+export DD_SCMREPS=$spool/interfaces/out/scm/SCMREPS
+#export DD_MONTREP=$spool/interfaces/out/fwu/FSTAD24
+export DD_REJOUTPUT=$data/temp/REJECTFILE
+export DD_FWUREPORT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_FWUREPORT__"${report_name}
+#export DD_FWUREPORT=$spool/interfaces/out/fwu/MONT_00001.299
+export DD_FWUREPORT=$spool/interfaces/out/fwu/MONT_${brch_no}.299
+export DD_OUTREP=$spool/interfaces/out/fwu/FSTAD44
+export DD_CAGREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_CAGVARIANCE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_variance_"${report_name}
+export DD_EZTREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_EZTSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_success_"${report_name}
+export DD_AMSREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_rejected_"${report_name}
+export DD_AMSSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_success_"${report_name}
+# Zaeem Changes Start
+#export DD_AMSRESPONSE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_amsresponse_"${report_name}
+export DD_AMSRESPONSE=$spool/interfaces/out/ameztrade/PEZSR_${dateyyyymmdd}.txt
+export DD_REJFILE=$spool/interfaces/EZTRADEREJFILE
+# Zaeem Changes End
+echo $file_path_name
+export DD_SPSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_success"
+export DD_SPFAILURE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_failure"
+export DD_REJOUT=$data/temp/FWUREJECTFILE
+
+# DDI changes
+export FILE_ADDRESSDDI=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+
+#changes for mep file
+echo $file_path_name
+if [ $upld_tp = "CPR" ] ;then
+	echo $file_path_name
+        export DD_CPREJECT=$file_path_name
+fi
+if [ $upld_tp = "CPA" ] ;then
+	echo $file_path_name_cpr
+        export DD_CPREJECT=$spool/Interfaces/BATCH-UPLOADS/BATCH-UPLOADS-ARCHIVE/CPR$file_path_name_cpr
+fi
+echo  $file_path_name
+export DD_CPREJECT=$file_path_name
+#changes for mep file
+#export DD_CPAREPT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"CPA_loan_success_"${ipcp_report_name}
+#export DD_CPRREPT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"CPA_loan_rejct_"${ipcp_report_name}
+#export DD_CPADEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"CPA_dep_success_"${ipcp_report_name}
+#export DD_CPRDEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"CPA_dep_reject_"${ipcp_report_name}
+export DD_CPAREPT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"SLWORKFL_"${ipcp_report_name}
+export DD_CPRREPT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"RLWORKFL_"${ipcp_report_name}
+export DD_CPADEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"SDWORKFL_"${ipcp_report_name}
+export DD_CPRDEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"RDWORKFL_"${ipcp_report_name}
+echo  $file_path_name
+export DD_IPREJECT=$file_path_name
+export DD_IPAREPT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"IPA_loan_success_"${ipcp_report_name}
+export DD_IPRREPT=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"IPA_loan_reject_"${ipcp_report_name}
+export DD_IPADEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"IPA_dep_success_"${ipcp_report_name}
+export DD_IPRDEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/"IPA_dep_reject_"${ipcp_report_name}
+export DD_PWFALON=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_loan_success_"${report_name}
+export DD_PWFRLON=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_loan_reject_"${report_name}
+export DD_PWFADEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_dep_success_"${report_name}
+export DD_PWFRDEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_dep_reject_"${report_name}
+export DD_FWFALON=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_loan_success_"${report_name}
+export DD_FWFRLON=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_loan_reject_"${report_name}
+export DD_FWFADEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_dep_success_"${report_name}
+export DD_FWFRDEP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_dep_reject_"${report_name}
+export DD_LACRESPFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_RESPONSE_"${dateddmmyyyy}"_"${file_time}.txt
+export DD_COLRESPFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_RESPONSE_"${dateddmmyyyy}"_"${file_time}.txt
+
+
+#batch_no=`echo $file_name | cut -d_ -f6 | cut -d. 1`
+batch_no=`echo $file_name | cut -d_ -f6 | cut -c 1-3`
+echo "Batch Number:" $batch_no
+#export DD_CMSFILE=$spool/interfaces/out/ics/CMSPICK.txt
+export DD_CMSFILEREP=$spool/interfaces/out/ics/CMSPICK_${batch_no}.txt
+export DD_IM41EP4L=$spool/interfaces/out/ics/IM41EP4L.txt
+
+#export DD_AMUTFILE=$spool/interfaces/out/ics/CWF.TXT
+export DD_AMUTFILE=$spool/interfaces/out/ics/CWF_${batch_no}.TXT
+#latedate=`grep 'HDR' $file_path_name | cut -c 8-15`    #Hot fix to generate only for AIC Upload Type
+#echo $latedate > /tmp/$LOGNAME/ICSDATE                 #Hot fix to generate only for AIC Upload Type
+#export DD_PPSFILE=$spool/interfaces/out/ics/PPS${dateyyyymmdd}_${batch_no}.txt #Hot fix to generate only for AIC Upload Type
+export DD_AMUTLATEFILE=$spool/interfaces/out/ics/AMUTS36_${batch_no}.txt
+export DD_CMSLATEFILE=$spool/interfaces/out/ics/CMSPICK_LATE_${batch_no}.txt
+#export DD_PPSLATEFILE=$spool/interfaces/out/ics/PPS${latedate}_${batch_no}.txt #Hot fix to generate only for AIC Upload Type
+if [ ${batch_no} = 001 ];
+  then
+#   export DD_ICSRIMS=$spool/interfaces/out/ics/ICSRIM-SUCC.txt
+#   export DD_ICSRIMF=$spool/interfaces/out/ics/ICSRIM-REJE.txt
+    export DD_ICSRIMS=$spool/interfaces/out/ics/ICSCRIM-SUCC.txt
+    export DD_ICSRIMF=$spool/interfaces/out/ics/ICSCRIM-REJE.txt
+   export DD_INDCHQOUTCRDT=$spool/interfaces/out/ics/INDCHQOUTCRDT.txt
+   export DD_ICFAILURE=$spool/interfaces/out/ics/DDRJET.txt
+   export DD_ICSUCCESS=$spool/interfaces/out/ics/ICSUCCESS_${batch_no}
+elif [ ${batch_no}  = 002 ];
+  then  
+#   export DD_ICSRIMS=$spool/interfaces/out/ics/ICSRIMI-SUCC.txt
+#   export DD_ICSRIMF=$spool/interfaces/out/ics/ICSRIMI-REJE.txt
+    export DD_ICSRIMS=$spool/interfaces/out/ics/ICSCRIMI-SUCC.txt
+    export DD_ICSRIMF=$spool/interfaces/out/ics/ICSCRIMI-REJE.txt
+   export DD_ICFAILURE=$spool/interfaces/out/ics/DDRJETI.txt
+   export DD_ICSUCCESS=$spool/interfaces/out/ics/ICSUCCESS_${batch_no}
+fi
+# Onsite Change for Trickle Feed Response File####
+ case $upld_tp  in
+#      ICL|TRF|OWC|IDH|VSA|SHR|ATM)
+      ICL|TRF|OWC|IDH|VSA|SHR)
+         export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFEXTR $TFM_REPT_ARG
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then  
+           rtsdb2 TFEXTR $TFM_REPT_ARG          
+        fi 
+         echo "..Executed TFEXTR for $TFM_REPT_ARG"
+      ;;
+ esac
+# Onsite Change for Trickle Feed Response File####
+case $upld_tp  in
+
+SAL)
+       export DD_TEMPFILE=$spool/SAL_TEMPFILE
+       export DD_SOCSOTESTMODE=$spool/SOCSOTESTMODE
+       export FILENAME=`echo "SAL_TEMPFILE"`
+       export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+       export DD_REPAYFILE=$file_path_name
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ATPREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ATPREP ${replica_no}
+        fi
+#Zaeem  mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFATP01*_${dateddmmyyyy}.txt $spool/interfaces/out/sal
+mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFATP01*_${dateddmmyyyy}.txt $spool/interfaces/out/aut        
+#if [ ! -s "$DD_TEMPFILE" ] || [ -s "$DD_REPAYFILE" ] ;
+#then
+#mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFATP01*_${dateddmmyyyy}.txt $spool/  
+#fi 
+     ;;
+BPC) 
+#     rtsora BPCREP ${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora BPCREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 BPCREP ${replica_no}
+        fi
+
+     ;;
+
+DIS) 
+#     rtsora DISREP ${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora DISREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 DISREP ${replica_no}
+        fi
+     ;;
+
+CLS)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh  CLSREP ${replica_no}
+    mv ${DD_CLSREPORT}  $spool/interfaces/out/cls/AFPOST.txt
+    perl -pi -e 's/#/ /' $spool/interfaces/out/cls/AFPOST.txt
+    ;;
+NEX)
+    export DD_DMOFILE=$spool/interfaces/out/nep/TRFDMO_01_001_${dateddmmyyyy}.txt
+    export DD_DMOREJ=$data/file/DMOREJ.txt
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh TRFDMO ${replica_no}
+    mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFDMO*${dateddmmyyyy}.txt $spool/interfaces/out/nep
+    ;;
+NET)
+    export DD_NETREPORT=$spool/interfaces/out/nep/TRFNEP04_01_001_${dateddmmyyyy}.txt
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh  NETREP ${replica_no}
+    ;;
+CTP)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh CTPREP ${replica_no}
+      ;;
+BSL)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh BSLREP ${replica_no}
+      ;;
+DOC)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh TRFOC1 ${replica_no}
+      ;;
+
+SCM)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      export DD_DUMMYFILESCM=$spool/interfaces/out/scm/SCM_MAINT_01_001_${dateddmmyyyy}.txt
+      run.sh SCMREP ${replica_no}
+      ;;
+
+CUD|STF)
+      export DD_TEMPCUDFILE=$spool/Interfaces/BATCH-UPLOADS-5/${file_name}
+      export DD_DUMMYFILECUD=$data/temp/CUDDUMMYFILE_$replica_no
+      export FILE_ADDRESS1=$spool/
+      run.sh CUDREP ${replica_no}
+      ;;
+
+LOC)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh TRFOC3 ${replica_no}
+      ;;
+FWU)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh FWUREP ${replica_no}
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/FSTAD24*_$dateddmmyyyy.txt $FWURES
+      rm -f $data/temp/FWUREJREP
+      ;;
+ORD)
+      echo 'BEFORE REPORT PROGRAM'
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh ORDREP ${replica_no}
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/FSTAD44*_$dateddmmyyyy.txt $FWURES
+      ;;
+LIM|APP)
+#     rtsora TFMAPP ${file_name}${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFMAPP ${file_name}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFMAPP ${file_name}${replica_no}
+        fi
+     ;;
+
+ACP)
+#     rtsora TFMACP ${replica_no}${brch_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFMACP ${file_name}${brch_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFMACP ${file_name}${brch_no}
+        fi
+     ;;  
+
+BLR)
+#       export DD_LONRILHP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/LONRILHP_${today_dt}.txt
+#       export DD_TFRRIU=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TFRRIU_${today_dt}.txt
+#       export DD_SUMMARYFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/LONRILSUM.txt
+       export DD_LONRILHP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/LONRILHP_${dateddmmyyyy}.TXT
+       export DD_TFRRIU=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TFRRIU_01_001_${dateddmmyyyy}.txt
+       export DD_SUMMARYFILE=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/LONRILSUM_01_001_${dateddmmyyyy}.txt
+       export DD_TEMPSORTED=$data/file/TEMPSORTED
+#AA1111 adding file for rejected records 
+       export DD_REJECTIONREC=$data/temp/REJECTIONREC  
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora BLRREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 BLRREP ${replica_no}
+        fi;;
+OCL|COC)
+#     rtsora OCLREP ${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora OCLREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 OCLREP ${replica_no}
+        fi
+     ;;
+#DOC)
+#     rtsora DOCREP ${replica_no}
+#     ;;
+#LOC)
+#     rtsora LOCREP ${replica_no}
+#     ;;
+
+MAN) 
+       export DD_MANSUCC=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/MANSUCCESS_${today_dt}_${file_time}_${inst_no}.txt
+       export DD_MANFAIL=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/MANFAILURE_${today_dt}_${file_time}_${inst_no}.txt
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora MANREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 MANREP ${replica_no}
+        fi;;
+AIC)
+#    rtsora AICREP ${replica_no}
+        export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        export DD_IMAIRFILE=$spool/interfaces/in/cms/CMS_ACC_NO_${dateddmmyyyy}.txt
+        export DD_AICFILE=$file_path_name
+#        export DD_AMUTRECFILE=$data/temp/AMUTRECFILE.txt
+#        export DD_AMUTRECFILE1=$data/temp/AMUTRECFILE1.txt
+        export DD_AMUTRECFILE1=$data/temp/AMUTRECFILE1_${batch_no}.txt
+        export DD_IM41ON=$data/file/IM41ON_${batch_no}_${dateddmmyyyy}
+        export DD_IM41ONFILE=$data/file/IM41ONFILE_${batch_no}_${dateddmmyyyy}
+        export DD_IM41ONDNOT=$data/file/IM41ONDNOT_${batch_no}    #Changes for 	Bug 82991
+        latedate=`grep 'HDR' $file_path_name | cut -c 8-15`    #Hot fix to generate only for AIC Upload Type
+        echo $latedate > /tmp/$LOGNAME/ICSDATE                 #Hot fix to generate only for AIC Upload Type
+        export DD_PPSFILE=$spool/interfaces/out/ics/PPS${dateyyyymmdd}_${batch_no}.txt #Hot fix to generate only for AIC Upload Type
+        export DD_PPSLATEFILE=$spool/interfaces/out/ics/PPS${latedate}_${batch_no}.txt #Hot fix to generate only for AIC Upload Type
+
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora AICREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           echo 'calling aicrep'
+           rtsdb2 AICREP ${replica_no}
+        fi
+        cd $spool/interfaces/out/ics
+#       awk '{ printf( "%-272.272s\n", $0 ); }' $spool/interfaces/out/ics/PPS${curr_date1}.txt > tempout
+#       cp tempout PPS${curr_date1}.txt
+#        awk '{ printf( "%-272.272s\n", $0 ); }' $DD_PPSFILE > tempout
+        awk '{ printf( "%-272.272s\n", $0 ); }' $DD_PPSFILE > tempout_${batch_no} 
+#        cp tempout $DD_PPSFILE
+        cp tempout_${batch_no} $DD_PPSFILE
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+#        awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/ICSUCCESS_${batch_no} > tempout
+        awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/ICSUCCESS_${batch_no} > tempout_${batch_no}
+#        cp tempout ICSUCCESS_${batch_no}
+        cp tempout_${batch_no} ICSUCCESS_${batch_no}
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+# 21517 Defect Changes Start
+#        awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/DDRJET.txt > tempout
+#        cp tempout DDRJET.txt
+#        rm -f tempout
+#        awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/DDRJETI.txt > tempout
+#        cp tempout DDRJETI.txt
+#        rm -f tempout
+        if [ ${batch_no} = 001 ]; then
+#           awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/DDRJET.txt > tempout
+           awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/DDRJET.txt > tempout_${batch_no}
+           cp tempout_${batch_no} DDRJET.txt
+        elif [ ${batch_no}  = 002 ]; then
+#           awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/DDRJETI.txt > tempout
+           awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/DDRJETI.txt > tempout_${batch_no}
+#           cp tempout DDRJETI.txt
+           cp tempout_${batch_no} DDRJETI.txt
+#           if [ -f $data/file/IM41ONFILE_${batch_no}_${dateddmmyyyy} ]; then           #Changes for Bug 82991 @ 12-Oct-2017 Spr - 
+#              cp $data/file/IM41ONFILE_${batch_no}_${dateddmmyyyy} /fns/${REGION_ID}/${BANCS_APPL}/inst/002/data/file #Changes for Bug 82991 @ 12-Oct-2017 Spr - 
+#           fi               #Changes for Bug 82991 @ 12-Oct-2017 Spr -75897
+            if [ -f $data/file/IM41ONDNOT_${batch_no} ]; then           #Changes for Bug 82991 @ 12-Oct-2017 Spr - 
+               cp $data/file/IM41ONDNOT_${batch_no}* /fns/${REGION_ID}/${BANCS_APPL}/inst/002/data/file #Changes for Bug 82991 @ 12-Oct-2017 Spr - 76014
+            fi               #Changes for Bug 82991 @ 12-Oct-2017 Spr -76014
+
+        fi 
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+#       awk '{ printf( "%-96.96s\n", $0 ); }' $spool/interfaces/out/ics/CWF.TXT > tempout
+#       cp tempout CWF.TXT
+#        awk '{ printf( "%-96.96s\n", $0 ); }' $DD_AMUTFILE > tempout
+        awk '{ printf( "%-96.96s\n", $0 ); }' $DD_AMUTFILE > tempout_${batch_no}
+#        cp tempout $DD_AMUTFILE
+        cp tempout_${batch_no} $DD_AMUTFILE
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+#        awk '{ printf( "%-150.150s\n", $0 ); }' $spool/interfaces/out/ics/CMSPICK.txt > tempout
+#        cp tempout CMSPICK.txt
+#       awk '{ printf( "%-141.141s\n", $0 ); }' $DD_CMSFILE > tempout
+#       cp tempout $DD_CMSFILE
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+#        awk '{ printf( "%-150.150s\n", $0 ); }' $DD_CMSFILEREP > tempout
+        awk '{ printf( "%-150.150s\n", $0 ); }' $DD_CMSFILEREP > tempout_${batch_no}
+#        cp tempout $DD_CMSFILEREP
+        cp tempout_${batch_no} $DD_CMSFILEREP
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+#        awk '{ printf( "%-96.96s\n", $0 ); }' $DD_AMUTLATEFILE > tempout
+        awk '{ printf( "%-96.96s\n", $0 ); }' $DD_AMUTLATEFILE > tempout_${batch_no}
+#        cp tempout $DD_AMUTLATEFILE
+        cp tempout_${batch_no} $DD_AMUTLATEFILE
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+#        awk '{ printf( "%-141.141s\n", $0 ); }' $DD_CMSLATEFILE > tempout
+        awk '{ printf( "%-141.141s\n", $0 ); }' $DD_CMSLATEFILE > tempout_${batch_no}
+#        cp tempout $DD_CMSLATEFILE
+        cp tempout_${batch_no} $DD_CMSLATEFILE
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+#        awk '{ printf( "%-275.275s\n", $0 ); }' $DD_PPSLATEFILE > tempout
+        awk '{ printf( "%-275.275s\n", $0 ); }' $DD_PPSLATEFILE > tempout_${batch_no}
+#        cp tempout $DD_PPSLATEFILE
+        cp tempout_${batch_no} $DD_PPSLATEFILE
+#        rm -f tempout
+        rm -f tempout_${batch_no}
+# 21517 Defect Changes End
+     ;;
+ACR)
+#    rtsora AICREP ${replica_no}
+        export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        export DD_ACRFILE=$file_path_name
+        export DD_ACRINPUTFILE=$data/file/ACRINPUTFILE
+        export DD_ACRREJFILE=$data/file/ACRREJFILE
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ACRREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           echo 'calling aicrep'
+           rtsdb2 ACRREP ${replica_no}
+        fi
+        if [ $BANCS_INST = 001 ];
+             then
+             perl -pi -e 's/#@/  /' $spool/interfaces/out/ics/ICSCRIM-SUCC.txt
+             perl -pi -e 's/#@/  /' $spool/interfaces/out/ics/ICSCRIM-REJE.txt
+        elif [ $BANCS_INST = 002 ];
+              then
+             perl -pi -e 's/#@/  /' $spool/interfaces/out/ics/ICSCRIMI-SUCC.txt
+             perl -pi -e 's/#@/  /' $spool/interfaces/out/ics/ICSCRIMI-REJE.txt
+        fi
+     ;;
+GPY)
+#      export DD_IPFILE=$spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_0001             #S74207
+#      export FILE_ID=`echo GPY_DRCR_REQ_${dateddmmyyyy}_0001   | awk -F"_" '{print $1$4$5}'`  #S74207
+#      export FILENAME=`echo "GPY_DRCR_REQ_${dateddmmyyyy}_0001"`                              #S74207
+#      export DD_IPFILE=$spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_????   #S74207   
+      GPYFILE_SEQ=`cat $spool/GPYFILE_SEQ_STORE.txt`
+      echo $GPYFILE_SEQ
+      export DD_IPFILE=$spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_${GPYFILE_SEQ}
+#     export FILE_ID=`echo GPY_DRCR_REQ_${dateddmmyyyy}_????   | awk -F"_" '{print $1$4$5}'`   #S74207
+#     FILENAME1=`echo $spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_????`   #S74207
+      export FILE_ID=`echo GPY_DRCR_REQ_${dateddmmyyyy}_${GPYFILE_SEQ}`
+      FILENAME1=`echo $spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_${GPYFILE_SEQ}`
+      export FILENAME=`echo ${FILENAME1} | cut -b 44-70`   #S74207
+#     input_file=`ls $spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_????` #S74207
+      input_file=`ls $spool/interfaces/in/gpy/GPY_DRCR_REQ_${GPYFILE_SEQ}`
+      seq_num=`echo ${input_file} | awk -F'[_]' '{print $5}'`  #S74207
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#    rtsora ADEXTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR 
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR
+        fi
+      mv $SOURCE $GPYRES
+      cd $GPYRES
+#      mv GPY_DEB_RES_${dateddmmyyyy} GPY_DRCR_RES_${dateddmmyyyy}             #S74207
+#      perl -pi -e 's/#@/  /' $GPYRES/GPY_DRCR_RES_${dateddmmyyyy}             #S74207
+#      mv GPY_DEB_RES_${dateddmmyyyy} GPY_DRCR_RES_${dateddmmyyyy}_${seq_num}   #S74207
+#      perl -pi -e 's/#@/  /' $GPYRES/GPY_DRCR_RES_${dateddmmyyyy}_${seq_num}   #S74207
+#     rm $spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_????   #S74207
+      mv GPY_DEB_RES_${dateddmmyyyy} GPY_DRCR_RES_${dateddmmyyyy}_${GPYFILE_SEQ}
+      rm GPYFILE_SEQ_STORE.txt                                                  #D75147 
+      perl -pi -e 's/#@/  /' $GPYRES/GPY_DRCR_RES_${dateddmmyyyy}_${GPYFILE_SEQ}
+#      rm $spool/interfaces/in/gpy/GPY_DRCR_REQ_${dateddmmyyyy}_${GPYFILE_SEQ}
+#       rm GPYFILE_SEQ_STORE.txt                                                 #D75147 
+     ;;
+ADT)
+      export DD_IPFILE=$spool/interfaces/in/amp/MBS_CREDIT_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo MBS_CREDIT_REQ_${dateddmmyyyy}_0001  | awk -F"_" '{print $1$4$5}'`
+      export FILENAME=`echo "MBS_CREDIT_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#      rtsora TFMBAC
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFMBAC
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFMBAC
+        fi
+      echo "SATURDAY"
+      mv $SORCE $MBSRES
+      perl -pi -e 's/\r//' $MBSRES 
+     ;;
+AMB)
+     export DD_IPFILE=$spool/interfaces/in/amab/AMAB_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo AMAB_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$$4$5}'`
+      export FILENAME=`echo "AMAB_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#      rtsora ADEXTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR
+        fi
+      mv $SOURCE $AMBRES 
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA01*_${dateddmmyyyy}.txt $AMBRES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA02*_${dateddmmyyyy}.txt $AMBRES
+      cd $AMBRES
+#      mv  AMB_DEB_RES_${dateddmmyyyy} AMAB_DEB_RES_${dateddmmyyyy}
+       mv  AMB_DEB_RES_${dateddmmyyyy} AMAB_${dateddmmyyyy}_DEB_RES
+#      perl -pi -e 's/#@/  /' $AMBRES/AMAB_DEB_RES_${dateddmmyyyy}
+       perl -pi -e 's/#@/  /' AMAB_${dateddmmyyyy}_DEB_RES  
+     ;;
+#AMS)
+#     export DD_IPFILE=$date/file/AMAS_CRE_REQ_${curr_date}_0001
+#     export FILE_ID=`echo AMAS_CRE_REQ_${curr_date}_0001 | awk -F"_" '{print $1$5}'`
+#     export FILENAME=`echo "AMAS_CRE_REQ_${curr_date}_0001"`
+#     export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#     rtsora ADEXTR ${replica_no}
+#        if [ $BANCS_DB_TYPE = ORA ];
+#           then
+#           rtsora ADEXTR ${replica_no}
+#        elif [ $BANCS_DB_TYPE = DB2 ];
+#           then
+#           rtsdb2 ADEXTR ${replica_no}
+#        fi
+#     ;;
+AKP)
+       export DD_INFILE=$spool/interfaces/in/akp/AKPK_HPPos_${dateddmmyyyy}.txt
+       export FILENAME=`echo "AKPK_HPPos_${dateddmmyyyy}.txt"` 
+       export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+       export DD_REPAYFILE=$file_path_name
+       if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora RE0034
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 RE0034
+        fi 
+         mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAKP01*_${dateddmmyyyy}.txt $spool/interfaces/out/akp
+       ;;
+AKK)
+       export DD_INFILE=$spool/interfaces/in/akp/ODAKPK.TXT
+       export FILENAME=`echo "ODAKPK.TXT"`
+       export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+       export DD_REPAYFILE=$file_path_name
+       if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora FIM354
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 FIM354
+        fi
+         mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAKP03*_${dateddmmyyyy}.txt $spool/interfaces/out/akp
+       ;; 
+AHL)
+      export DD_INFILE=$spool/interfaces/in/akp/ALSAKPK.TXT
+       export FILENAME=`echo "ALSAKPK.TXT"`
+       export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+       export DD_REPAYFILE=$file_path_name
+       if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora RE1093
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 RE1093
+        fi
+        mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAKP02*_${dateddmmyyyy}.txt $spool/interfaces/out/akp
+       ;;  
+ABT)
+      export DD_IPFILE=$date/file/AMAB_FIRE_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo AMAB_FIRE_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$4$5}'`
+      export FILENAME=`echo "AMAB_FIRE_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      #66137 FS 37 ADDDED BELOW TWO FILE FOR FIRE INSURANCE FILE FS-37
+      export DD_FAM105=$data/file/FAM105
+      export DD_TRFTEMP=$data/temp/TFAMABTEMP
+#      rtsora TAKADB ${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TAKADB ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TAKADB ${replica_no}
+        fi
+      perl -pi -e 's/\r//' $SOURCE
+      mv $SOURCE $AMBRES
+      cd $AMBRES
+        mv ABT_DEB_RES_${dateddmmyyyy}  AMAB_${dateddmmyyyy}_FIRE_RES
+        perl -pi -e 's/#@/  /' $data/file/FAM105
+#       cp $data/file/FAM105 $spool/FAM105_${dateddmmyyyy}
+        cp $data/file/FAM105 $spool/interfaces/out/emc/FAM105
+        perl -pi -e 's/#@/  /' $AMBRES/AMAB_${dateddmmyyyy}_FIRE_RES
+#       perl -pi -e 's/#@//' $AMBRES/AMAB_${dateddmmyyyy}_FIRE_RES
+
+     ;;
+AML)
+      export DD_IPFILE=$spool/interfaces/in/amlife/AMLF_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo AMLF_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$$4$5}'`
+      export FILENAME=`echo "AMLF_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#      rtsora ADEXTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR 
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR 
+        fi
+      mv $SOURCE $AMLDES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA03*_${dateddmmyyyy}.txt $AMLDES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA04*_${dateddmmyyyy}.txt $AMLDES
+      cd $AMLDES
+      mv AML_DEB_RES_${dateddmmyyyy} AMLF_${dateddmmyyyy}_DEB_RES
+      perl -pi -e 's/#@/  /' $AMLDES/AMLF_${dateddmmyyyy}_DEB_RES
+     ;;
+CRP)
+      export CRPRES_ADDR=$spool/interfaces/out/crp/
+#     export DD_IPFILE=$spool/interfaces/in/crp/CRP_DEBIT_REQ_${dateddmmyyyy}_0001
+#     export DD_IPFILE=$spool/interfaces/in/crp/CRP_DEBIT_REQ_${dateddmmyyyy}_0001
+#     export FILE_ID=`echo CRP_DEBIT_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$$4$5}'`
+#     export FILENAME=`echo "CRP_DEBIT_REQ_${dateddmmyyyy}_0001"`
+      cd $spool/interfaces/in/crp
+      export FILENAME=`ls CRP_DEBIT_REQ_????????_0001`
+      export DD_IPFILE=$spool/interfaces/in/crp/$FILENAME
+      export FILE_ID=`echo $FILENAME | awk -F"_" '{print $1$$4$5}'`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#      rtsora CPADTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora CPADTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 CPADTR
+        fi
+#below three lines commented to cater req of IA-948
+#      mv $SOURCE $CRPRES
+#      cd $CRPRES
+#      mv CRP_DEB_RES_${dateddmmyyyy} CRP_DEBIT_RES_${dateddmmyyyy}
+#      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFCPR01*_${dateddmmyyyy}.txt $spool/interfaces/out/crp
+
+#Zaeem:Defect 18643       perl -pi -e 's/#@/  /' $CRPRES/CRP_DEBIT_RES_${dateddmmyyyy}
+       perl -pi -e 's/#@/  /' $CRPRES/CRP_DEBIT_RES_*
+     ;;
+#ADDED FOR MAA AND MAA TAKAFUL AUTO DEBIT TRICKLE FEED PROCESSING
+
+MAA)
+      export CRPRES_ADDR=$SOURCE
+      export FILE_ID=`echo BL-AM-MAA-001-${yymmdd}-REQ.TXT | awk -F"-" '{print $3$4}'`
+      export FILENAME=`echo "BL-AM-MAA-001-${yymmdd}-REQ.TXT"`
+       echo "Bibek Lal"
+       echo $FILENAME
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora CPADTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+
+          rtsdb2 CPADTR
+      fi
+      mv $SOURCE $MAARES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFMAA01*_${dateddmmyyyy}.txt $MAARES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFMAA02*_${dateddmmyyyy}.txt $MAARES
+      cd $MAARES
+      mv MAA_DEB_RES_${dateddmmyyyy} BL-AM-MAA-001-${yymmdd}-RSP-01.TXT
+      perl -pi -e 's/#@/  /' $MAARES/BL-AM-MAA-001-${yymmdd}-RSP-01.TXT
+     ;;
+MAT)
+      export CRPRES_ADDR=$SOURCE
+      export FILE_ID=`echo BL-AM-MAAT-001-${yymmdd}-REQ.TXT | awk -F"-" '{print $3$4}'`
+      export FILENAME=`echo "BL-AM-MAAT-001-${yymmdd}-REQ.TXT"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora CPADTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+
+          rtsdb2 CPADTR
+      fi
+
+      mv $SOURCE $MATRES
+      cd $MATRES
+#      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFMAA03*_${dateddmmyyyy}.txt $MAARES
+#      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFMAA04*_${dateddmmyyyy}.txt $MAARES
+        mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFMAA03*_${dateddmmyyyy}.txt $MATRES
+        mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFMAA04*_${dateddmmyyyy}.txt $MATRES
+      mv MAT_DEB_RES_${dateddmmyyyy} BL-AM-MAAT-001-${yymmdd}-RSP-01.TXT
+      perl -pi -e 's/#@/  /' $MATRES/BL-AM-MAAT-001-${yymmdd}-RSP-01.TXT
+     ;;
+AEO)
+      export CRPRES_ADDR=$SOURCE
+      export FILENAME=`echo "AEON_${dateddmmyyyy}_DEB_REQ_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora CPADTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+
+          rtsdb2 CPADTR
+      fi
+
+      mv $SOURCE $AEORES 
+      cd $AEORES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAEO01*_${dateddmmyyyy}.txt $AEORES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAEO02*_${dateddmmyyyy}.txt $AEORES
+      mv AEO_DEB_RES_${dateddmmyyyy} BL-AM-AEON-001-${yymmdd}-RSP-01.TXT
+      perl -pi -e 's/#@/  /' $AEORES/BL-AM-AEON-001-${yymmdd}-RSP-01.TXT
+#      mv AEO_DEB_RES_${dateddmmyyyy} BL-AM-AEON-001-${yymmdd}-RSP-01.txt
+#      perl -pi -e 's/#@/  /' $AEORES/AEON_${dateddmmyyyy}_DEB_RES
+#      perl -pi -e 's/#@/  /' $AEORES/BL-AM-AEON-001-${yymmdd}-RSP-01.txt
+     ;;
+AEU)
+      export CRPRES_ADDR=$SOURCE
+      export FILENAME=`echo "AEUN_${dateddmmyyyy}_DEB_REQ_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora CPADTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+
+          rtsdb2 CPADTR
+      fi
+
+      mv $SOURCE $AEORES
+      cd $AEORES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAEO03*_${dateddmmyyyy}.txt $AEORES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAEO04*_${dateddmmyyyy}.txt $AEORES
+      mv AEU_DEB_RES_${dateddmmyyyy} BL-AM-AEON-002-${yymmdd}-RSP-01.TXT
+      perl -pi -e 's/#@/  /' $AEORES/BL-AM-AEON-002-${yymmdd}-RSP-01.TXT
+     ;;
+#MAA AND MAA TAKAFUL END.
+EAL)
+      export FILENAME=`echo "ALERTDBCRTRANS.txt"`
+#---- START SCR 72752 - FILEPATH CHANGE FOR THE INPUT FILE FOR ALERTDBCRTRANS.txt
+#     export DD_IPFILE=$spool/interfaces/in/alert/ALERTDBCRTRANS.txt
+      export DD_IPFILE=$spool/interfaces/in/dms/ALERTDBCRTRANS.txt
+#---- END SCR 72752 - FILEPATH CHANGE FOR THE INPUT FILE FOR ALERTDBCRTRANS.txt
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora EA0009
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+
+          rtsdb2 EA0009
+      fi
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFEAL01*_${dateddmmyyyy}.txt $spool/interfaces/out/dms
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFEAL02*_${dateddmmyyyy}.txt $spool/interfaces/out/dms
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFEAL03*_${dateddmmyyyy}.txt $spool/interfaces/out/dms
+
+#      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFEAL01*_${dateddmmyyyy}.txt $spool/interfaces/out/alert
+#      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFEAL02*_${dateddmmyyyy}.txt $spool/interfaces/out/alert
+#      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFEAL03*_${dateddmmyyyy}.txt $spool/interfaces/out/alert
+     ;;
+AMP)
+      export DD_IPFILE=$spool/interfaces/in/amp/AMPL_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo AMPL_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$4$5}'`
+      export FILENAME=`echo "AMPL_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#      rtsora ADEXTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR
+        fi
+      mv $SOURCE $AMPRES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA05*_${dateddmmyyyy}.txt $AMPRES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA06*_${dateddmmyyyy}.txt $AMPRES
+      cd $AMPRES
+      mv  AMP_DEB_RES_${dateddmmyyyy} AMPL_${dateddmmyyyy}_DEB_RES
+      perl -pi -e 's/#@/  /' $AMPRES/AMPL_${dateddmmyyyy}_DEB_RES
+     ;;
+
+AMA)
+      export DD_IPFILE=$date/file/AMAS_${curr_date}_DEB_REQ_0001
+      export FILE_ID=`echo AMAS_${curr_date}_DEB_REQ_0001 | awk -F"_" '{print $1$5}'`
+      export FILENAME=`echo "AMAS_${curr_date}_DEB_REQ_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#     rtsora ADEXTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR
+        fi
+     ;;
+
+TAK)
+#      export DD_IPFILE=$spool/interfaces/in/amp/TAKF_DEB_REQ_${dateddmmyyyy}_0001
+      export DD_IPFILE=$spool/interfaces/in/amt/TAKF_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo TAKF_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$4$5}'`
+      export FILENAME=`echo "TAKF_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#      rtsora ADEXTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR
+        fi
+      mv $SOURCE $TAKRES
+      cd $TAKRES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA07*_${dateddmmyyyy}.txt $TAKRES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMA08*_${dateddmmyyyy}.txt $TAKRES
+      mv TAK_DEB_RES_${dateddmmyyyy} TAKF_${dateddmmyyyy}_DEB_RES 
+      perl -pi -e 's/#@/  /' $TAKRES/TAKF_${dateddmmyyyy}_DEB_RES 
+     ;;
+
+AMU)
+      export DD_IPFILE=$sysout/AMUT_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo AMUT_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$4$5}'`
+      export FILENAME=`echo "AMUT_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#      rtsora ADEXTR
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR
+        fi
+      mv $SOURCE $AMURES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMU01*_${dateddmmyyyy}.txt $AMURES
+      mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFAMU02*_${dateddmmyyyy}.txt $AMURES
+      cd $AMURES
+      mv AMU_DEB_RES_${dateddmmyyyy} AMUT_DEB_RES_${dateddmmyyyy}
+      perl -pi -e 's/#@/  /' $AMURES/AMUT_DEB_RES_${dateddmmyyyy}
+
+     ;;
+
+MBS)
+      export DD_IPFILE=$spool/interfaces/in/mbs/MBS_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo MBS_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$4$5}'`
+      export FILENAME=`echo "MBS_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ADEXTR
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ADEXTR
+        fi
+      mv $SOURCE $MBSRES
+      cd $MBSRES
+      mv MBS_DEB_RES_${dateddmmyyyy} MBS_DEBIT_${dateddmmyyyy}_RES
+      cd $MBSRES
+      perl -pi -e 's/#@/  /' $MBSRES/MBS_DEBIT_${dateddmmyyyy}_RES
+     ;;
+PRL)
+      export DD_IPFILE=$spool/interfaces/in/prul/PRUL_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo PRUL_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$$4$5}'`
+      export FILENAME=`echo "PRUL_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#     rtsora PRUREP
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora PRUREP
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 PRUREP
+        fi
+      perl -pi -e 's/\r//' $SOURCE
+      mv $SOURCE $PRLRES
+#      mv $SRC $PRLRES    i###############Commented as no more used
+#      mv $SRC1 $PRLRES    ###############Commented as no more used
+      cd $PRLRES
+      mv PRL_DEB_RES_${dateddmmyyyy}  PRUDLOUT.TXT        
+#      mv SUCSS.txt TRFPRU03 ###############Commented as no more used
+#      mv REJ.txt TRFPRU04   ###############Commented as no more used
+     ;;
+
+PRG)
+      export DD_IPFILE=$spool/interfaces/in/prug/PRUG_DEB_REQ_${dateddmmyyyy}_0001
+      export FILE_ID=`echo PRUG_DEB_REQ_${dateddmmyyyy}_0001 | awk -F"_" '{print $1$$4$5}'`
+      export FILENAME=`echo "PRUG_DEB_REQ_${dateddmmyyyy}_0001"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+#     rtsora PRUREP
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora PRUREP
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 PRUREP
+        fi
+      perl -pi -e 's/\r//' $SOURCE
+      mv $SOURCE $PRGRES
+#      mv $SRC $PRGRES    ###############Commented as no more used
+#      mv $SRC1 $PRGRES   ###############Commented as no more used
+      cd $PRGRES
+      mv PRG_DEB_RES_${dateddmmyyyy} PRUDGOUT.TXT   
+#      mv  SUCSS.txt TRFPRU01    ###############Commented as no more used
+#      mv  REJ.txt TRFPRU02      ###############Commented as no more used
+     ;;
+
+BUL)
+#     rtsora BULREP ${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora BULREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 BULREP ${replica_no}
+        fi
+     ;;
+CIF)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMRCI 
+      if  [ $? -eq "0" ]
+        then
+        cp $data/temp/LONFILE $spool/Interfaces/BATCH-UPLOADS-TEMP/LON_${brch_no}_${curr_date}_${file_time}_${curr_date}_000.txt
+       echo "****TFMRCI COMPLETED SUCESSFULLY******"
+      fi
+      ;;
+LON)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMRLC
+     if  [ $? -eq "0" ]
+     then
+        cp $data/temp/ADVNFILE $spool/Interfaces/BATCH-UPLOADS-TEMP/LO1_${brch_no}_${curr_date}_${file_time}_${curr_date}_000.txt
+     echo  $? "****TFMRLC COMPLETED SUCESSFULLY******"
+     fi
+     ;;     
+
+LAC)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t LACREP
+     ;;
+
+COL)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t COLREP
+     ;;
+
+
+LO1)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMRLA 
+     ;;
+     
+REM)
+#     rtsora REMREP ${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora REMREP ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 REMREP ${replica_no}
+        fi
+     ;;
+CDA)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFMRDA ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFMRDA ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+     ;;
+URF)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMRLA
+     ;;
+CAG)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    export DD_TEMPREJ=$data/file/TEMPREJ
+    run.sh -t CAGREP
+    ;;
+ERU)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    export DD_ERUSUCCESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/SUCCESS_CURR_UPDT.txt
+    export DD_ERUREJECTED=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/REJECT_CURR_UPDT.txt
+    export DD_ERUREPORT=$spool/interfaces/out/FCAS-FINIQ/
+    export DD_DUMMYRATEFILE=$data/temp/DUMMY_EXCHANGE_RATE.txt
+    run.sh -t ERUREP
+    ;;
+EZT)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t EZTREP
+    ;;
+AMS)
+    echo 'PRINTING REPORT'
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t AMSREP
+    perl -pi -e 's/#@/  /' $DD_AMSRESPONSE
+    ;;
+
+KOP)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMKOP
+    ;;
+
+
+AHR)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMAHR
+    ;;
+
+PET)
+    export DD_RPET008ZFIL=$spool/interfaces/out/pet/RPET008Z.FIL
+    export DD_VARIANCEFILE=$spool/VARIANCEFILE
+    export DD_PETREJ=$spool/interfaces/in/pet/PETREJ
+    export DD_REJVARIANCSSUM=$spool/interfaces/in/pet/REJVARIANCSSUM
+    export DD_REJVARIANCCOMP=$spool/interfaces/in/pet/REJVARIANCCOMP
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMPET
+    ;;
+
+PTO)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMPTO
+    ;;
+
+TMF)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMTM1
+    ;;
+          
+SEC)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t TFMRCA
+     ;; 
+OWC)
+     export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+     run.sh -t OWCREP
+     rm -f $spool/OWCFILE123
+    ;;
+IDH)
+     export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+     run.sh -t IDHREP
+     rm -f $spool/IDHFILE123
+   ;;
+INT)
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh -t INTREP
+   ;; 
+AUC)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t AUCREP
+   ;;    
+CPA)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh  CPAREP ${replica_no}
+    ;;
+CPR)
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    run.sh -t CPAREP ${replica_no}
+    ;;
+IPA)
+   export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   export DD_TEMPFILE=$spool/TEMPFILE
+   export DD_TEMPFILE1=$spool/TEMPFILE1
+   run.sh -t IPAREP ${replica_no}
+   ;;
+IPR)
+   export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   export DD_TEMPFILE=$spool/TEMPFILE
+   export DD_TEMPFILE1=$spool/TEMPFILE1
+   rm $spool/TEMPFILE*
+   rm $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFIPA*
+   run.sh -t IPAREP ${replica_no}
+   ;;
+PWF)
+   export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   run.sh -t PWFREP ${replica_no}
+   ;;
+FWF)
+   export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   run.sh -t FWFREP ${replica_no}
+   ;;
+SEQ)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora SEQREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 SEQREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+   ;;
+RPU)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora RPUREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 RPUREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+   ;;
+SEZ)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora SECREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 SECREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+   ;;
+CMS)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFCMSR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFCMSR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+    echo ${replica_no}
+    ;;
+CMN)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFCMSQ ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFCMSQ ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+    echo ${replica_no}
+    ;;
+RMC)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFMRMR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFMRMR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+           mv $DD_PRNTRMC1 $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_POST_"${dateddmmyyyy}"_${rmc_rep_name}""_SUCC"
+           mv $DD_PRNTRMC2 $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/${upld_tp}"_POST_"${dateddmmyyyy}"_${rmc_rep_name}""_REJ"
+        fi
+    echo ${replica_no}
+   ;;
+RML)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora RMLREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 RMLREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+   ;;
+DBD)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora DBDREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 DBDREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+   ;;
+LBD)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora LBDREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 LBDREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+   ;;
+SPL)
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora SPLREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 SPLREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+    ;; 
+DBC)
+        export DD_TEMPFILE=$spool/DBCREP_FILE
+        export DD_MFLAGS=$data/file/MFLAGS
+        CCYYMMDD=`cut -c 9-12 $data/file/MFLAGS``cut -c 13-14 $data/file/MFLAGS``cut -c 15-16 $data/file/MFLAGS`
+        export DD_DBCGSTSUCC=$spool/interfaces/out/ocm/DBC_${CCYYMMDD}_001_RESPONSE.txt
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora DBCREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 DBCREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+           perl -pi -e 's/#@//' $spool/interfaces/out/ocm/DBC_${CCYYMMDD}_001_RESPONSE.txt
+        fi
+    ;;
+ATD)
+      export DD_TEMPFILE=$spool/interfaces/in/adb/TEMPFILE_AUTODEBIT
+      export DD_IPFILE=$spool/interfaces/in/adb/ATDB_DEB_REQ_${dateddmmyyyy}_????
+      export FILE_ID=`echo ATDB_DEB_REQ_${dateddmmyyyy}_???? | awk -F"_" '{print $1$4$5}'`
+      export FILENAME=`echo "ATDB_DEB_REQ_${dateddmmyyyy}_????"`
+      export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+      run.sh -t ADSGGL
+      perl -pi -e 's/#@/  /' $ATDRES/????_DEB_RES_${dateddmmyyyy}.txt
+      rm $spool/interfaces/in/adb/TEMPFILE_AUTODEBIT
+     ;;
+ATM)
+        export DD_TEMPFILE=$spool/ATMREP_FILE
+        export DD_MFLAGS=$data/file/MFLAGS
+        CCYYMMDD=`cut -c 9-12 $data/file/MFLAGS``cut -c 13-14 $data/file/MFLAGS``cut -c 15-16 $data/file/MFLAGS`
+        export DD_ATMGSTSUCC=$spool/interfaces/out/ocm/ATM_${CCYYMMDD}_001_RESPONSE.txt
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora ATMREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 ATMREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+           perl -pi -e 's/#@//' $spool/interfaces/out/ocm/ATM_${CCYYMMDD}_001_RESPONSE.txt
+        fi
+    ;;
+TKM)
+    echo "upld_tp is in TKM $upld_tp"
+    echo "BANCS_DB_TYPE is in TKM $BANCS_DB_TYPE"
+        export DD_REJECTFILE=$spool/interfaces/in/tm/REJECTFILE
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora FAM694 ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 FAM694 ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+    ;;
+
+KPS)    
+   echo "upld_tp is in KPS $upld_tp"
+   echo "BANCS_DB_TYPE is in KPS $BANCS_DB_TYPE"
+   export DD_TEMPSUCC1=$spool/interfaces/in/nep/TEMPSUCC1
+   export DD_REJECTFILE1=$spool/interfaces/in/nep/REJECTFILE1
+   export DD_TEMPSUCC2=$spool/interfaces/in/nep/TEMPSUCC2
+   export DD_REJECTFILE2=$spool/interfaces/in/nep/REJECTFILE2
+   export DD_SUCCTRAIL=$spool/interfaces/in/nep/SUCCTRAIL
+   export DD_REJTRAIL=$spool/interfaces/in/nep/REJTRAIL
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora AM0621 ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 AM0621 ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+   ;;
+
+REF)
+   echo "upld_tp is in REF $upld_tp"
+   echo "BANCS_DB_TYPE is in REF $BANCS_DB_TYPE"
+   export DD_SUCCFILE=$spool/interfaces/in/nep/SUCCFILE
+   export DD_REJFILE=$spool/interfaces/in/nep/REJECTFILE
+   export FILE_ADDRESS=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/
+   export FILE_PGLIMIT=24998
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora AM0631 ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 AM0631 ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+   ;;
+AMW)
+       export DD_TEMPFILE=$spool/AMW_TEMPFILE
+       export DD_SORTFILE=$spool/AMW_SORTFILE
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora AMWREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 AMWREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+    ;;
+HRF|SSD|SSC)
+   echo "upld_tp is  $upld_tp"
+   export DD_HRFRFILE=$spool/interfaces/out/FCAS-FINIQ/FIQHLDREMRES_${dateddmmyyyy}.TXT                       
+   export DD_SSDRFILE=$spool/interfaces/out/FCAS-FINIQ/FIQDEBRES_${dateddmmyyyy}.TXT                         
+   export DD_SSCRFILE=$spool/interfaces/out/FCAS-FINIQ/FIQCRERES_${dateddmmyyyy}.TXT                         
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora TFINIR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 TFINIR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+   if [ $upld_tp = HRF ];
+    then
+       perl -pi -e 's/#@//' $spool/interfaces/out/FCAS-FINIQ/FIQHLDREMRES_${dateddmmyyyy}.TXT
+   fi
+   if [ $upld_tp = SSD ];
+    then
+       perl -pi -e 's/#@//' $spool/interfaces/out/FCAS-FINIQ/FIQDEBRES_${dateddmmyyyy}.TXT
+   fi
+   if [ $upld_tp = SSC ];
+    then
+       perl -pi -e 's/#@//' $spool/interfaces/out/FCAS-FINIQ/FIQCRERES_${dateddmmyyyy}.TXT
+   fi
+  ;;        
+AMM)
+        echo "upld_tp is in AMM $upld_tp"
+        export DD_TEMPFILE=$spool/interfaces/in/amw/TEMPFILE
+        export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TRFEIC ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TRFEIC ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        fi
+    ;;
+AMR)
+        echo "upld_tp is in AMR $upld_tp"
+        export DD_TEMPFILE1=$spool/interfaces/in/amw/TEMPFILE1
+        export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        run.sh TRFRNR ${replica_no}
+    ;;
+PDC)
+   export DD_SUCCFILE=$spool/SUCCFILE
+   export DD_FAILFILE=$spool/FAILFILE                   
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora TFPDCR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 TFPDCR ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+CHQ)
+   export DD_SUCCFILE=$spool/CHQSUCCFILE
+   export DD_FAILFILE=$spool/CHQFAILFILE
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora TRFCHQ ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 TRFCHQ ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+FCY)
+
+  export DD_FCAAFILE=$spool/FCAAFILE
+  if [ $BANCS_DB_TYPE = ORA ];
+      then
+      rtsora FCAREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  elif [ $BANCS_DB_TYPE = DB2 ];
+    then
+     rtsdb2 FCAREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  fi
+ ;;
+
+ WMS)
+     echo "upld_tp is in WMS $upld_tp"
+     export DD_SUCCESSREP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TFMWMS_01_${inst_no}_${dateddmmyyyy}.txt                                     
+     export DD_DUMMYFILE=$data/temp/DUMMYFILE
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora WMSREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 WMSREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+ ;;
+
+MDC)
+  export DD_MDCFILE=$spool/MDCFILE
+  if [ $BANCS_DB_TYPE = ORA ];
+      then
+      rtsora MDCREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  elif [ $BANCS_DB_TYPE = DB2 ];
+    then
+     rtsdb2 MDCREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  fi
+ ;;
+
+PNS)
+  export DD_DUMMYFILE=$spool/DUMMYFILE_${replica_no}
+  if [ $BANCS_DB_TYPE = ORA ];
+      then
+     rtsora PNSREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  elif [ $BANCS_DB_TYPE = DB2 ];
+    then
+    echo "enter PNSREP"
+     rtsdb2 PNSREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    echo "exit PNSREP"
+  fi
+;;
+
+
+CVA)
+    export DD_SUCCESSDUMMYFILE=$spool/CVASUCCESSDUMMYFILE
+    export DD_FAILUREDUMMYFILE=$spool/CVAFAILUREDUMMYFILE
+#    export DD_ACCNTFILE=$spool/ACCOUNT_NAME_AND_ADDRRESS_CREATION.txt
+    export DD_ACCNTFILE=$spool/ACCOUNT_NAME_AND_ADDRESS_CREATION.txt
+    export DD_SWEEPCRTFILE=$spool/SWEEP_CREATE_VIRTUAL_COLL.txt
+    if [ $BANCS_DB_TYPE = ORA ];
+        then
+        rtsora CVAREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+    elif [ $BANCS_DB_TYPE = DB2 ];
+        then
+        account_create.sh ${replica_no}
+        rtsdb2 CVAREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+     fi
+     ;;
+
+
+VFT)
+   export DD_SUCCESSDUMMYFILE=$spool/VFTSUCCDUMMYFILE
+   export DD_FAILUREDUMMYFILE=$spool/VFTFAILDUMMYFILE
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora VFTREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 VFTREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+
+ANC)
+   export DD_SUCCESSDUMMYFILE=$spool/ANCSUCCDUMMYFILE
+   export DD_FAILUREDUMMYFILE=$spool/ANCFAILDUMMYFILE
+   export ANCCSVDATAFILE=$spool/
+   Headercard=$card/AM0299.card
+   header1=`grep '$ANCREP' $Headercard | cut -c 18-272`
+   export ACCNTNAMEFILEHDR=$header1
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora ANCREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 ANCREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+
+SWP)
+   export DD_SUCCESSDUMMYFILE=$spool/SWPSUCCDUMMYFILE
+   export DD_FAILUREDUMMYFILE=$spool/SWPFAILDUMMYFILE
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora SWPREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 SWPREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+
+ICF)
+   export DD_ICFDUMMYFILE=$spool/ICFDUMMYFILE_${replica_no}
+#   export ICFREJECTFILE=$data/file/
+   export ICFREJECTFILE=$spool/
+   export ICFOUTFILE=$spool/interfaces/out/ift/
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora ICFREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+       then
+       rtsdb2 ICFREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+   mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFICF01*_${dateddmmyyyy}_${replica_no}*.txt $IFTRES
+   echo "In the query"
+#   seq_no=`db2 -x select substr(EXTERNAL_MSG2,30,7) from TF${replica_no} where AREA_JRNL_NO <> \' \' fetch first 1 rows only`
+   seq_no=$(db2 -x "select substr(EXTERNAL_MSG2,30,7) from TF${replica_no} where AREA_JRNL_NO <> ' ' fetch first 1 rows only")
+   echo "ICF File name is: " ${seq_no}
+   echo "Return code1 " $?
+   echo "Path is  $IFTRES/MULCRDRIFT_DRCR_RES_${dateddmmyyyy}_${seq_no} "
+   echo "Return code2 " $?
+   perl -pi -e 's/#@/  /' $IFTRES/MULCRDRIFT_DRCR_RES_${dateddmmyyyy}_${seq_no}
+   echo "Return code " $?
+  ;;
+
+ICR)
+   export DD_ICRDUMMYFILE=$spool/ICRDUMMYFILE_${replica_no}
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora ICRREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+       then
+       rtsdb2 ICRREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+   mv $spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFICR01*_${dateddmmyyyy}_${replica_no}*.txt $IFTRES
+  ;;
+
+
+DDI)
+  echo "IN REPORTS FILE "
+  export DD_DDIOUTFILE=$spool/interfaces/out/dd/DDIOUTFILE.txt
+  export DD_SUCCESSDUMMYFILE=$spool/DDISUCCDUMMYFILE
+  export DD_FAILUREDUMMYFILE=$spool/DDIFAILDUMMYFILE
+  if [ $BANCS_DB_TYPE = ORA ];
+      then
+      rtsora DDIREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  elif [ $BANCS_DB_TYPE = DB2 ];
+    then
+     rtsdb2 DDIREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  fi
+ ;;
+
+
+VAC)
+   export DD_SUCCESSDUMMYFILE=$spool/VACSUCCDUMMYFILE
+   export DD_FAILUREDUMMYFILE=$spool/VACFAILDUMMYFILE
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora VACREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 VACREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+
+RPP)
+   export DD_RPPDUMMYFILE=$spool/RPPDUMMYFILE_${replica_no}
+   export DD_REJECTREC=$spool/interfaces/in/rpp/REJECTREC_${today_dt}.txt
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora RPPREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+       then
+       rtsdb2 RPPREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+
+RPR)
+   export DD_RPRDUMMYFILE=$spool/RPRDUMMYFILE_${replica_no}
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora RPRREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+       then
+       rtsdb2 RPRREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+
+ADV)
+   export DD_SUCCESSDUMMYFILE=$spool/ADVSUCCDUMMYFILE
+   export DD_FAILUREDUMMYFILE=$spool/ADVFAILDUMMYFILE
+   if [ $BANCS_DB_TYPE = ORA ];
+       then
+       rtsora ADVREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   elif [ $BANCS_DB_TYPE = DB2 ];
+     then
+      rtsdb2 ADVREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+   fi
+  ;;
+
+GLO)
+    echo "upld_tp is in GLO $upld_tp"
+#    export DD_SUCCESSREP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFGLO_${today_dt}.txt       
+#   export DD_SUCCESSREP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFGLO01_01_001_${today_dt}.txt                 
+#   export DD_SUCCESSREP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFGLO_01_001_${today_dt}.txt
+    export DD_SUCCESSREP=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/TRFGLO_01_001_${dateddmmyyyy}.txt
+    export DD_DUMMYFILE=$data/temp/DUMMYFILE
+  if [ $BANCS_DB_TYPE = ORA ];
+      then
+      rtsora GLOREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  elif [ $BANCS_DB_TYPE = DB2 ];
+    then
+     rtsdb2 GLOREP ${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+  fi
+ ;;
+
+
+*)   
+    export TFM_REPT_ARG=${inst_no}${today_dt}${file_time}${file_no}${replica_no}
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora TFMREP $TFM_REPT_ARG
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 TFMREP $TFM_REPT_ARG
+        fi
+    rm -f $spool/TFRECFILE123
+    rm -f $spool/TFEXTFILE123
+     ;;
+esac
+exit_code=$?
+
+if [ $upld_tp =  "CPN" ]; then
+        export REPLICA_NO=${replica_no}
+        ext_name="CPNEXT_"$report_name
+        ext_path_name=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/$ext_name
+        export DD_PENEXT=$ext_path_name
+        run.sh -t TFMPET
+        exit_code=$?
+        if [ "$exit_code" -eq "0" ]
+        then
+           echo "CHNLG" $DD_PENEXT reports/$curr_date1/$ext_name | TBpush
+        else
+           exit $exit_code
+        fi &
+fi
+
+if [ $upld_tp =  "REM" ]; then
+        export REPLICA_NO=${replica_no}
+        ext_name="REMEXT_"$report_name
+        ext_path_name=$spool/Interfaces/BATCH-UPLOADS/TRICKLE-FEED-REPORTS/$ext_name
+        export DD_REMEXT=$ext_path_name
+
+        if [ $BANCS_DB_TYPE = ORA ];
+           then
+           rtsora REMEXT ${replica_no}
+        elif [ $BANCS_DB_TYPE = DB2 ];
+           then
+           rtsdb2 REMEXT ${replica_no}
+        fi
+
+        exit_code=$?
+        if [ "$exit_code" -eq "0" ]
+        then
+           echo $brch_no $DD_REMEXT reports/$curr_date1/$ext_name | TBpush
+        else
+           exit $exit_code
+        fi &
+fi
+if [ "$exit_code" -eq "0" ]
+then
+   tffm_status=40
+#   UPDATE_TABLE_TFFM
+   tfrm_status=S
+#   UPDATE_TABLE_TFRM
+else
+   tffm_status=30
+   UPDATE_TABLE_TFFM
+   tfrm_status=K
+   UPDATE_TABLE_TFRM
+   echo "******Error Creating REPORT/EXTRACT******"
+   exit $exit_code
+fi
+
+cd $spool/Interfaces/BATCH-UPLOADS-5
+mv ${file_name} ../BATCH-UPLOADS/BATCH-UPLOADS-ARCHIVE/.
+if [ "$exit_code" -eq "0" ]
+then
+   echo $brch_no $DD_PRINTF1 reports/$curr_date1/$DD_FILE1 | TBpush
+else
+   exit $exit_code
+fi &
+echo "**** End Of Trickle Feed Processing at " `date` " **** "
+
+}
+################ *** FUNC: Report Generation Prog Complete***  ###
+
+
+
+############################################################################
+################## MAIN PROCESSING STARTS ##################################
+############################################################################
+if [ $upld_tp = "TFS" ]; then
+        currency=`echo $file_name | cut -d "_" -f6 | cut -d "." -f1`
+elif [ $BANCS_DB_TYPE = ORA ] ; then
+currency=`sqlplus -s \/ << EOF
+WHENEVER SQLERROR EXIT 99
+set heading off
+set pagesize 0
+select NATIVE_CURRENCY from insp where SOC_NO_1 =  '$BANCS_INST';
+exit
+EOF`
+elif [ $BANCS_DB_TYPE = DB2 ] ; then
+db2 connect to $DB2_SID
+currency=`db2 -s -x \
+"select NATIVE_CURRENCY from insp where SOC_NO_1 =  '$BANCS_INST'"`
+
+   if [ $? -ne 0 ]; then
+              echo "Error in currency fetch "
+              tfrm_status=K
+              UPDATE_TABLE_TFRM
+              echo "******Exiting from processing******"
+              exit 1
+   fi
+
+fi
+#lang=01
+lang=`grep "LANG " $card/TFFILE.card | sed 's/ //g' | cut -c 5-6`
+curr_dir=`pwd`
+curr_date=`cut -c 15-16 $data/file/MFLAGS``cut -c 13-14 $data/file/MFLAGS``cut -c 9-12 $data/file/MFLAGS`
+
+cd $spool/Interfaces/BATCH-UPLOADS-5
+
+if [ -f "$file_path_name" ]; then
+   tffm_status=00
+   echo "\nFile Present At Destination Folder"
+else
+#   echo "\nALERT!File Not Present At Destination Folder"
+     tffm_status=99
+#   UPDATE_TABLE_TFFM
+#   tfrm_status=S
+#   UPDATE_TABLE_TFRM
+#   exit 1
+fi
+
+case $status in 
+       
+00|10)
+
+#tffm_status=10
+#UPDATE_TABLE_TFFM
+
+#sqlplus -s \/ <<EOF
+#WHENEVER SQLERROR EXIT 99
+#delete tf${replica_no};
+#exit;
+#EOF
+ 
+#if [ $? -ne 0 ]; then
+#   echo "******Truncation of Table Failed: SQLERROR ENCOUNTERED******"
+#   tfrm_status=K
+#   UPDATE_TABLE_TFRM
+#   echo "******Exiting from processing******"
+#   exit 1
+#fi
+
+STARTAREA_CREATION
+MAIN_LINE_PROCESSING
+REPORT_CREATION
+;;
+
+20)
+MAIN_LINE_PROCESSING
+REPORT_CREATION
+;;
+
+30)
+REPORT_CREATION
+;;
+
+esac
+
+############################################################################
+################## MAIN PROCESSING ENDS ####################################
+############################################################################

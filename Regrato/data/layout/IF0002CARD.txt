@@ -1,0 +1,14 @@
+File Type
+From
+To
+Commit Count
+Fetch Count
+Update Count
+DB Connect Flag
+1
+19
+19
+6
+3
+3
+1

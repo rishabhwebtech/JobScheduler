@@ -1,0 +1,16 @@
+File Type
+From
+To
+Commit Count
+Fetch Count
+Update Count
+DB Connect Flag
+Sel Active Acc
+1
+19
+19
+6
+4
+4
+1
+1
